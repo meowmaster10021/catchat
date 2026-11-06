@@ -1,7 +1,7 @@
 const http=require("node:http"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
 const {DatabaseSync}=require("node:sqlite");
 const ROOT="meowmaster100",PORT=+process.env.PORT||8080,DATA=process.env.DATA_DIR||"/data";
-const ADMIN_PW=process.env.ADMIN_PASSWORD||"110921-fury";
+const ADMIN_PW=process.env.ADMIN_PASSWORD||"";
 if(ADMIN_PW.length<6){console.error("Set ADMIN_PASSWORD (6+ characters), e.g. fly secrets set ADMIN_PASSWORD=...");process.exit(1)}
 fs.mkdirSync(DATA,{recursive:true});
 const db=new DatabaseSync(path.join(DATA,"meow.db"));
@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY AUTOINCREMENT,name TE
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,pid TEXT,ts INTEGER);
 CREATE TABLE IF NOT EXISTS blocked(id TEXT PRIMARY KEY);`);
 try{db.exec("ALTER TABLE items ADD COLUMN kind TEXT DEFAULT 'normal'")}catch(e){}
+try{db.exec("ALTER TABLE players ADD COLUMN infinite INTEGER DEFAULT 0");db.exec("UPDATE players SET infinite=1 WHERE id='meowmaster100'")}catch(e){}
 const q=s=>db.prepare(s);
 const hashPw=(pw,salt)=>crypto.scryptSync(pw,salt,32).toString("hex");
 const same=(a,b)=>{const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&crypto.timingSafeEqual(x,y)};
@@ -22,7 +23,7 @@ const find=id=>q("SELECT * FROM players WHERE id=?").get(String(id||"").toLowerC
 // The admin account always uses ADMIN_PASSWORD; nobody else can register that name.
 {const salt=crypto.randomBytes(16).toString("hex"),h=hashPw(ADMIN_PW,salt);
  if(find(ROOT))q("UPDATE players SET salt=?,hash=?,admin=1,banned=0 WHERE id=?").run(salt,h,ROOT);
- else q("INSERT INTO players(id,name,salt,hash,admin) VALUES(?,?,?,?,1)").run(ROOT,ROOT,salt,h);
+ else q("INSERT INTO players(id,name,salt,hash,admin,infinite) VALUES(?,?,?,?,1,1)").run(ROOT,ROOT,salt,h);
  q("DELETE FROM sessions WHERE ts<?").run(Date.now()-30*864e5)}
 
 const fails=new Map();
@@ -60,19 +61,20 @@ function auth(req,url){
 const clamp=(v,n)=>Math.max(0,Math.min(n-1,parseInt(v)||0));
 const post=(name,text,sys=1)=>q("INSERT INTO messages(name,text,ts,sys) VALUES(?,?,?,?)").run(name,text,Date.now(),sys);
 const adm=p=>{if(!p.admin)bad("Admins only")},root=p=>{if(p.id!==ROOT)bad("Only "+ROOT+" can do that")};
+const inf=p=>!!(p.admin&&p.infinite);
 const wipe=id=>{q("DELETE FROM sessions WHERE pid=?").run(id);q("DELETE FROM messages WHERE lower(name)=?").run(id);q("DELETE FROM players WHERE id=?").run(id)};
 const actions={
  send(p,b){const t=String(b.text||"").trim().slice(0,300);if(!t)bad("Empty message");
   if(Date.now()-(lastMsg.get(p.id)||0)<500)bad("Slow down");lastMsg.set(p.id,Date.now());post(p.name,t,0)},
  pay(p,b){const t=find(b.to),n=parseInt(b.amt);
   if(!t||t.banned||t.id===p.id)bad("Pick another player by name");if(!(n>0))bad("Enter an amount");
-  if(p.id!==ROOT){if(p.coins<n)bad("You don’t have that many coins");q("UPDATE players SET coins=coins-? WHERE id=?").run(n,p.id)}
+  if(!inf(p)){if(p.coins<n)bad("You don’t have that many coins");q("UPDATE players SET coins=coins-? WHERE id=?").run(n,p.id)}
   q("UPDATE players SET coins=coins+? WHERE id=?").run(n,t.id);post(p.name,`${p.name} sent ${n} coins to ${t.name}`)},
  daily(p){if(Date.now()-p.daily<864e5)bad("Daily bonus isn’t ready yet");q("UPDATE players SET coins=coins+50,daily=? WHERE id=?").run(Date.now(),p.id)},
  buy(p,b){const i=q("SELECT * FROM items WHERE id=?").get(parseInt(b.id));
-  if(!i)bad("That item is gone");if(i.stock===0)bad("Sold out");if(p.id!==ROOT&&p.coins<i.price)bad("Not enough coins");
+  if(!i)bad("That item is gone");if(i.stock===0)bad("Sold out");if(!inf(p)&&p.coins<i.price)bad("Not enough coins");
   const inv=JSON.parse(p.inv);inv[i.id]=(inv[i.id]||0)+1;
-  q("UPDATE players SET coins=coins-?,inv=? WHERE id=?").run(p.id===ROOT?0:i.price,JSON.stringify(inv),p.id);
+  q("UPDATE players SET coins=coins-?,inv=? WHERE id=?").run(inf(p)?0:i.price,JSON.stringify(inv),p.id);
   if(i.stock>0)q("UPDATE items SET stock=stock-1 WHERE id=?").run(i.id);
   post(p.name,`${p.name} bought ${i.emoji} ${i.name}${i.kind==="physical"?" (a real one!)":""}`)},
  avatar(p,b){
@@ -87,6 +89,7 @@ const actions={
   const inv=JSON.parse(p.inv);if(!inv[i.id])bad("You don’t have that");
   if(--inv[i.id]<=0)delete inv[i.id];
   q("UPDATE players SET inv=? WHERE id=?").run(JSON.stringify(inv),p.id);post(p.name,`${p.name} got rid of a ${i.emoji} ${i.name}`)},
+ infinite(p,b){adm(p);q("UPDATE players SET infinite=? WHERE id=?").run(b.on?1:0,p.id)},
  "item/add"(p,b){adm(p);const name=String(b.name||"").trim().slice(0,40);if(!name)bad("Give the item a name");
   const st=parseInt(b.stock);
   q("INSERT INTO items(name,emoji,descr,price,stock,kind) VALUES(?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),Math.max(1,parseInt(b.price)||1),st>0?st:-1,["physical","fun"].includes(b.kind)?b.kind:"normal")},
@@ -109,7 +112,7 @@ function tx(fn){db.exec("BEGIN");try{const r=fn();db.exec("COMMIT");return r}cat
 // ---- live updates (Server-Sent Events)
 const clients=new Set();
 const pub=p=>{const a=JSON.parse(p.avatar||"{}");
- return{id:p.id,name:p.name,coins:p.coins,admin:!!p.admin,banned:!!p.banned,avatar:Object.keys(a).length?{...a,photo:p.photo?`/avatar/${p.id}?v=${p.pv}`:""}:undefined}};
+ return{id:p.id,name:p.name,coins:p.coins,admin:!!p.admin,banned:!!p.banned,inf:!!(p.admin&&p.infinite),avatar:Object.keys(a).length?{...a,photo:p.photo?`/avatar/${p.id}?v=${p.pv}`:""}:undefined}};
 const snapshot=()=>JSON.stringify({
  players:q("SELECT * FROM players").all().map(pub),
  items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal"})),

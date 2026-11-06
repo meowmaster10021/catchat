@@ -172,7 +172,7 @@ addEventListener("resize",()=>meId&&setTab(tab));
 function renderAll(){
  if(me()&&me().banned){meId=null;$("#app").style.display="none";$("#login").style.display="grid";fail("Your account has been banned.");logoutLocal();return}
  if(!me())return;
- $("#bal").textContent="🪙 "+(meId===ROOT?"∞":me().coins);
+ $("#bal").textContent="🪙 "+(me().inf?"∞":me().coins);
  if(!isAdmin()&&tab==="admin")tab="shop";
  setTab(tab);renderChat();renderShop();renderWallet();renderSettings();renderAdmin();
 }
@@ -199,7 +199,7 @@ async function pay(to,amt){await api("pay",{to,amt})}
 function renderShop(){
  const list=Object.entries(items),m=me();
  $("#p-shop").innerHTML=`<h2>Shop</h2>`+(list.length?list.map(([id,i])=>{
-  const out=i.stock===0,poor=m&&meId!==ROOT&&m.coins<i.price;
+  const out=i.stock===0,poor=m&&!m.inf&&m.coins<i.price;
   return `<div class="card"><div class="e">${esc(i.emoji||"🎁")}</div><div class="i"><b>${esc(i.name)}</b>${kindTag(i)}<small>${esc(i.desc||"")}${i.stock>0?` · ${i.stock} left`:""}</small><span class="price">🪙 ${i.price}</span></div><button data-buy="${id}" ${out||poor?"disabled":""}>${out?"Sold out":"Buy"}</button></div>`}).join(""):`<div class="empty">The shop is empty.${isAdmin()?" Add the first item in the Admin tab.":" An admin will stock it soon."}</div>`);
 }
 $("#p-shop").onclick=async e=>{
@@ -210,9 +210,9 @@ $("#p-shop").onclick=async e=>{
 function renderWallet(){
  const m=me(),box=$("#p-wallet");if(!m)return;
  if(box.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;
- const R=meId===ROOT,left=864e5-(Date.now()-(m.daily||0));
+ const R=!!m.inf,left=864e5-(Date.now()-(m.daily||0));
  const inv=Object.entries(m.inv||{}).filter(([id])=>items[id]);
- const isR=p=>p.name.toLowerCase()===ROOT;
+ const isR=p=>!!p.inf;
  const top=Object.values(players).filter(p=>!p.banned).sort((a,b)=>isR(b)-isR(a)||b.coins-a.coins).slice(0,8);
  const names=Object.values(players).filter(p=>p.name.toLowerCase()!==meId&&!p.banned);
  box.innerHTML=`<div class="set" style="text-align:center"><small style="color:var(--mute)">Your balance</small><div class="big-bal">🪙 ${R?"∞":m.coins}</div><button data-daily ${left>0?"disabled":""}>${left>0?`Daily bonus in ${Math.ceil(left/36e5)}h`:"Claim 50 daily coins"}</button></div>
@@ -272,11 +272,12 @@ function renderAdmin(){
  const box=$("#p-admin");if(!isAdmin()){box.innerHTML="";return}
  if(box.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;
  const ps=Object.entries(players).sort((a,b)=>a[1].name.localeCompare(b[1].name));
- box.innerHTML=`<h2>Add shop item</h2>
+ box.innerHTML=`<div class="card"><div class="i"><b>Infinite coins</b><small>Spend freely and show ∞ on your balance. Only admins have this switch.</small></div><button class="${me().inf?"":"ghost"}" data-inf="${me().inf?0:1}">${me().inf?"On":"Off"}</button></div>
+ <h2>Add shop item</h2>
  <form id="af" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji" maxlength="4"><input name="name" placeholder="Item name" required maxlength="40"></div>
  <input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="1" placeholder="Price" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div><select name="kind" aria-label="Item type"><option value="normal">Regular item (collectible)</option><option value="physical">Real item (you hand it over yourself)</option><option value="fun">Just for fun (useless, they can get rid of it)</option></select><button>Add item</button></form>
  <h2>Items</h2>${Object.entries(items).map(([id,i])=>`<div class="card"><div class="e">${esc(i.emoji||"🎁")}</div><div class="i"><b>${esc(i.name)}</b><small>🪙 ${i.price}</small></div><button class="bad" data-rm="${id}">Remove</button></div>`).join("")||'<div class="empty">No items.</div>'}
- <h2>Players</h2>${ps.map(([id,p])=>{const R=meId===ROOT,self=id===ROOT;return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}${p.banned?'<span class="tag" style="background:var(--danger);color:#fff">banned</span>':""}<small>🪙 ${self?"∞":p.coins}</small></div>${self?"":`<button class="ghost" data-adm="${id}">${p.admin?"Remove admin":"Make admin"}</button>`}${R&&!self?`<div class="row" style="flex-basis:100%"><input type="number" placeholder="Coins (− takes)" data-amt="${id}"><button data-give="${id}">Give</button><button class="bad" data-ban="${id}">Ban &amp; delete</button></div>`:""}</div>`}).join("")}
+ <h2>Players</h2>${ps.map(([id,p])=>{const R=meId===ROOT,self=id===ROOT;return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}${p.banned?'<span class="tag" style="background:var(--danger);color:#fff">banned</span>':""}<small>🪙 ${p.inf?"∞":p.coins}</small></div>${self?"":`<button class="ghost" data-adm="${id}">${p.admin?"Remove admin":"Make admin"}</button>`}${R&&!self?`<div class="row" style="flex-basis:100%"><input type="number" placeholder="Coins (− takes)" data-amt="${id}"><button data-give="${id}">Give</button><button class="bad" data-ban="${id}">Ban &amp; delete</button></div>`:""}</div>`}).join("")}
  ${meId===ROOT&&(me().blocked||[]).length?`<h2>Banned names</h2>`+me().blocked.map(n=>`<div class="card"><div class="i"><b>${esc(n)}</b></div><button class="ghost" data-unban="${esc(n)}">Allow again</button></div>`).join(""):""}
  <h2>Chat</h2><button class="bad" data-clear>Clear all messages</button>`;
 }
@@ -287,7 +288,8 @@ $("#p-admin").onsubmit=async e=>{
 $("#p-admin").onclick=async e=>{
  if(!isAdmin())return;const d=e.target.dataset;
  try{
-  if(d.rm)await api("item/remove",{id:d.rm});
+  if(d.inf!==undefined)await api("infinite",{on:d.inf==="1"});
+  else if(d.rm)await api("item/remove",{id:d.rm});
   else if(d.adm)await api("admin/promote",{to:d.adm});
   else if(d.give&&meId===ROOT){const n=parseInt(document.querySelector(`[data-amt="${d.give}"]`).value);if(!n)return toast("Enter an amount");await api("admin/give",{to:d.give,n})}
   else if(d.ban&&meId===ROOT){if(confirm("Ban "+(players[d.ban]?players[d.ban].name:d.ban)+"? This deletes their account, coins and messages, and blocks the name."))await api("admin/ban",{to:d.ban})}
