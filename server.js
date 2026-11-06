@@ -1,8 +1,8 @@
 const http=require("node:http"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
 const {DatabaseSync}=require("node:sqlite");
-const ROOT="meowmaster100",PORT=+process.env.PORT||8080,DATA=process.env.DATA_DIR||"/tmp/catchat";
-const ADMIN_PW=process.env.ADMIN_PASSWORD||"110921-fury";
-if(ADMIN_PW.length<6){console.error("Set ADMIN_PASSWORD (6+ characters), add it under Environment on your host");process.exit(1)}
+const ROOT="meowmaster100",PORT=+process.env.PORT||8080,DATA=process.env.DATA_DIR||"/data";
+const ADMIN_PW=process.env.ADMIN_PASSWORD||"";
+if(ADMIN_PW.length<6){console.error("Set ADMIN_PASSWORD (6+ characters), e.g. fly secrets set ADMIN_PASSWORD=...");process.exit(1)}
 fs.mkdirSync(DATA,{recursive:true});
 const db=new DatabaseSync(path.join(DATA,"meow.db"));
 db.exec(`PRAGMA journal_mode=WAL;
@@ -14,44 +14,6 @@ CREATE TABLE IF NOT EXISTS blocked(id TEXT PRIMARY KEY);`);
 try{db.exec("ALTER TABLE items ADD COLUMN kind TEXT DEFAULT 'normal'")}catch(e){}
 try{db.exec("ALTER TABLE players ADD COLUMN infinite INTEGER DEFAULT 0");db.exec("UPDATE players SET infinite=1 WHERE id='meowmaster100'")}catch(e){}
 const q=s=>db.prepare(s);
-
-// ---- persistence: the host's disk is wiped when the server sleeps, so the whole
-// database is copied to Supabase (one row) after changes and loaded back on startup.
-const SB_URL=(process.env.SUPABASE_URL||"https://xuypsjiugzozzqosnacx.supabase.co/rest/v1/").replace(/\/+$/,""),SB_KEY=process.env.SUPABASE_SERVICE_KEY||"sb_publishable_pmUEDJeboU4xU5modz2suQ_rwnHQasS",SB_ON=!!(SB_URL&&SB_KEY);
-const TABLES=["players","items","messages","sessions","blocked"];
-const sb=(method,p,body)=>fetch(SB_URL+"/rest/v1/"+p,{method,headers:{apikey:SB_KEY,...(SB_KEY.startsWith("eyJ")?{Authorization:"Bearer "+SB_KEY}:{}),"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:body&&JSON.stringify(body)});
-const dump=()=>{const o={};for(const t of TABLES)o[t]=db.prepare("SELECT * FROM "+t).all();return o};
-async function restore(){
- if(!SB_ON){console.warn("WARNING: SUPABASE_URL / SUPABASE_SERVICE_KEY not set. Data will be lost when the server sleeps.");return}
- for(let i=0;i<5;i++){
-  try{
-   const r=await sb("GET","backup?id=eq.1&select=data");
-   if(!r.ok)throw new Error(r.status+" "+await r.text());
-   const rows=await r.json();
-   if(rows.length){const d=rows[0].data||{};
-    for(const t of TABLES)for(const row of d[t]||[]){const c=Object.keys(row);
-     db.prepare(`INSERT OR REPLACE INTO ${t}(${c.join(",")}) VALUES(${c.map(()=>"?").join(",")})`).run(...c.map(k=>row[k]))}
-    console.log("Restored data from Supabase")}
-   else console.log("No backup yet, starting fresh");
-   return;
-  }catch(e){console.error("Restore attempt failed:",e.message);await new Promise(r=>setTimeout(r,3000))}
- }
- console.error("Could not read the Supabase backup. Stopping so an empty database never overwrites it.");process.exit(1);
-}
-let saveTimer=null,saving=false,again=false;
-async function save(){
- if(!SB_ON)return;if(saving){again=true;return}
- saving=true;
- try{do{again=false;const r=await sb("POST","backup?on_conflict=id",{id:1,data:dump()});if(!r.ok)throw new Error(r.status+" "+await r.text())}while(again)}
- catch(e){console.error("Backup failed:",e.message);setTimeout(scheduleSave,10000)}
- finally{saving=false}
-}
-function scheduleSave(){if(!SB_ON||saveTimer)return;saveTimer=setTimeout(()=>{saveTimer=null;save()},2000)}
-const bye=async()=>{clearTimeout(saveTimer);saveTimer=null;await save();process.exit(0)};
-process.on("SIGTERM",bye);process.on("SIGINT",bye);
-
-(async()=>{
-await restore();
 const hashPw=(pw,salt)=>crypto.scryptSync(pw,salt,32).toString("hex");
 const same=(a,b)=>{const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&crypto.timingSafeEqual(x,y)};
 class E extends Error{}
@@ -165,7 +127,7 @@ const snapshot=()=>JSON.stringify({
  messages:q("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all()});
 function sendTo(c,base){const m=find(c.pid);if(!m)return;
  c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),daily:m.daily,blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined})+"}\n\n")}
-function push(){scheduleSave();if(!clients.size)return;const base=snapshot();for(const c of clients)sendTo(c,base)}
+function push(){if(!clients.size)return;const base=snapshot();for(const c of clients)sendTo(c,base)}
 setInterval(()=>{for(const c of clients)c.res.write(": ping\n\n")},25000);
 
 // ---- http
@@ -197,7 +159,7 @@ http.createServer(async(req,res)=>{
    const act=url.pathname.slice(5),b=await readBody(req);
    if(act==="login"){const ip=req.headers["fly-client-ip"]||req.socket.remoteAddress;const r=login(b,ip);push();return J(res,200,r)}
    const p=auth(req,url);if(!p)return J(res,401,{error:"auth"});
-   if(act==="logout"){q("DELETE FROM sessions WHERE token=?").run((req.headers.authorization||"").replace(/^Bearer /,""));scheduleSave();return J(res,200,{ok:1})}
+   if(act==="logout"){q("DELETE FROM sessions WHERE token=?").run((req.headers.authorization||"").replace(/^Bearer /,""));return J(res,200,{ok:1})}
    if(!Object.hasOwn(actions,act))return J(res,404,{error:"Unknown action"});
    const r=tx(()=>actions[act](p,b));push();
    if(r&&r.kick)for(const c of clients)if(c.pid===r.kick){c.res.write("event: bye\ndata: "+(r.reason||"")+"\n\n");c.res.end();clients.delete(c)}
@@ -209,5 +171,3 @@ http.createServer(async(req,res)=>{
   console.error(e);J(res,500,{error:"Server error"});
  }
 }).listen(PORT,"0.0.0.0",()=>console.log("CatChat listening on "+PORT));
-scheduleSave();
-})().catch(e=>{console.error(e);process.exit(1)});
