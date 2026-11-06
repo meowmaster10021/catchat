@@ -1,7 +1,7 @@
 const http=require("node:http"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
 const {DatabaseSync}=require("node:sqlite");
 const ROOT="meowmaster100",PORT=+process.env.PORT||8080,DATA=process.env.DATA_DIR||"/data";
-const ADMIN_PW=process.env.ADMIN_PASSWORD||"110921-fury";
+const ADMIN_PW=process.env.ADMIN_PASSWORD||"";
 if(ADMIN_PW.length<6){console.error("Set ADMIN_PASSWORD (6+ characters), e.g. fly secrets set ADMIN_PASSWORD=...");process.exit(1)}
 fs.mkdirSync(DATA,{recursive:true});
 const db=new DatabaseSync(path.join(DATA,"meow.db"));
@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,
 CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,text TEXT,ts INTEGER,sys INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,pid TEXT,ts INTEGER);
 CREATE TABLE IF NOT EXISTS blocked(id TEXT PRIMARY KEY);`);
+try{db.exec("ALTER TABLE items ADD COLUMN kind TEXT DEFAULT 'normal'")}catch(e){}
 const q=s=>db.prepare(s);
 const hashPw=(pw,salt)=>crypto.scryptSync(pw,salt,32).toString("hex");
 const same=(a,b)=>{const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&crypto.timingSafeEqual(x,y)};
@@ -73,7 +74,7 @@ const actions={
   const inv=JSON.parse(p.inv);inv[i.id]=(inv[i.id]||0)+1;
   q("UPDATE players SET coins=coins-?,inv=? WHERE id=?").run(p.id===ROOT?0:i.price,JSON.stringify(inv),p.id);
   if(i.stock>0)q("UPDATE items SET stock=stock-1 WHERE id=?").run(i.id);
-  post(p.name,`${p.name} bought ${i.emoji} ${i.name}`)},
+  post(p.name,`${p.name} bought ${i.emoji} ${i.name}${i.kind==="physical"?" (a real one!)":""}`)},
  avatar(p,b){
   const a={mode:b.mode==="photo"?"photo":"cat",fur:clamp(b.fur,8),eyes:clamp(b.eyes,5),pat:clamp(b.pat,4),acc:clamp(b.acc,5)};
   let photo=p.photo,pv=p.pv;
@@ -81,9 +82,14 @@ const actions={
   else if(typeof b.photo==="string"&&b.photo.length<80000&&/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(b.photo)){photo=b.photo;pv++}
   if(!photo)a.mode="cat";
   q("UPDATE players SET avatar=?,photo=?,pv=? WHERE id=?").run(JSON.stringify(a),photo,pv,p.id)},
+ discard(p,b){const i=q("SELECT * FROM items WHERE id=?").get(parseInt(b.id));
+  if(!i||i.kind!=="fun")bad("You can only get rid of fun items");
+  const inv=JSON.parse(p.inv);if(!inv[i.id])bad("You don’t have that");
+  if(--inv[i.id]<=0)delete inv[i.id];
+  q("UPDATE players SET inv=? WHERE id=?").run(JSON.stringify(inv),p.id);post(p.name,`${p.name} got rid of a ${i.emoji} ${i.name}`)},
  "item/add"(p,b){adm(p);const name=String(b.name||"").trim().slice(0,40);if(!name)bad("Give the item a name");
   const st=parseInt(b.stock);
-  q("INSERT INTO items(name,emoji,descr,price,stock) VALUES(?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),Math.max(1,parseInt(b.price)||1),st>0?st:-1)},
+  q("INSERT INTO items(name,emoji,descr,price,stock,kind) VALUES(?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),Math.max(1,parseInt(b.price)||1),st>0?st:-1,["physical","fun"].includes(b.kind)?b.kind:"normal")},
  "item/remove"(p,b){adm(p);q("DELETE FROM items WHERE id=?").run(parseInt(b.id))},
  "admin/promote"(p,b){adm(p);const t=find(b.to);if(!t||t.id===ROOT)bad("You can’t change that player");
   q("UPDATE players SET admin=? WHERE id=?").run(t.admin?0:1,t.id);post(p.name,`${t.name} ${t.admin?"is no longer":"is now"} an admin`)},
@@ -106,7 +112,7 @@ const pub=p=>{const a=JSON.parse(p.avatar||"{}");
  return{id:p.id,name:p.name,coins:p.coins,admin:!!p.admin,banned:!!p.banned,avatar:Object.keys(a).length?{...a,photo:p.photo?`/avatar/${p.id}?v=${p.pv}`:""}:undefined}};
 const snapshot=()=>JSON.stringify({
  players:q("SELECT * FROM players").all().map(pub),
- items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock})),
+ items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal"})),
  messages:q("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all()});
 function sendTo(c,base){const m=find(c.pid);if(!m)return;
  c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),daily:m.daily,blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined})+"}\n\n")}

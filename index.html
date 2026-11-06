@@ -19,7 +19,7 @@ button.ghost{background:transparent;border:1px solid var(--line);color:var(--ink
 button.bad{background:var(--danger);color:#fff}
 button:disabled{opacity:.45;cursor:default}
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-input,textarea{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:.55em .75em;width:100%}
+input,textarea,select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:.55em .75em;width:100%}
 #login{height:100%;display:grid;place-items:center;padding:1rem}
 #login form{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:1.6rem;width:min(380px,100%);display:grid;gap:.8rem}
 #login h1{margin:0;font-size:1.9rem}
@@ -115,6 +115,7 @@ function avHTML(p,big){
 }
 const showAv=()=>ls.get("meow-showav")!=="0";
 const applyAv=()=>document.body.classList.toggle("noav",!showAv());
+const kindTag=i=>i&&i.kind==="physical"?'<span class="tag">📦 real item</span>':i&&i.kind==="fun"?'<span class="tag">🎈 just for fun</span>':"";
 function toast(t){const e=$("#toast");e.textContent=t;e.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display="none",2600)}
 function fail(t){$("#err").textContent=t}
 
@@ -199,7 +200,7 @@ function renderShop(){
  const list=Object.entries(items),m=me();
  $("#p-shop").innerHTML=`<h2>Shop</h2>`+(list.length?list.map(([id,i])=>{
   const out=i.stock===0,poor=m&&meId!==ROOT&&m.coins<i.price;
-  return `<div class="card"><div class="e">${esc(i.emoji||"🎁")}</div><div class="i"><b>${esc(i.name)}</b><small>${esc(i.desc||"")}${i.stock>0?` · ${i.stock} left`:""}</small><span class="price">🪙 ${i.price}</span></div><button data-buy="${id}" ${out||poor?"disabled":""}>${out?"Sold out":"Buy"}</button></div>`}).join(""):`<div class="empty">The shop is empty.${isAdmin()?" Add the first item in the Admin tab.":" An admin will stock it soon."}</div>`);
+  return `<div class="card"><div class="e">${esc(i.emoji||"🎁")}</div><div class="i"><b>${esc(i.name)}</b>${kindTag(i)}<small>${esc(i.desc||"")}${i.stock>0?` · ${i.stock} left`:""}</small><span class="price">🪙 ${i.price}</span></div><button data-buy="${id}" ${out||poor?"disabled":""}>${out?"Sold out":"Buy"}</button></div>`}).join(""):`<div class="empty">The shop is empty.${isAdmin()?" Add the first item in the Admin tab.":" An admin will stock it soon."}</div>`);
 }
 $("#p-shop").onclick=async e=>{
  const id=e.target.dataset.buy;if(!id)return;
@@ -216,7 +217,7 @@ function renderWallet(){
  const names=Object.values(players).filter(p=>p.name.toLowerCase()!==meId&&!p.banned);
  box.innerHTML=`<div class="set" style="text-align:center"><small style="color:var(--mute)">Your balance</small><div class="big-bal">🪙 ${R?"∞":m.coins}</div><button data-daily ${left>0?"disabled":""}>${left>0?`Daily bonus in ${Math.ceil(left/36e5)}h`:"Claim 50 daily coins"}</button></div>
  <h2>Send coins</h2><form id="payf" class="set"><div class="row"><input name="to" list="plist" placeholder="Player name" required maxlength="16" autocomplete="off"><input name="amt" type="number" min="1" placeholder="Amount" required></div><datalist id="plist">${names.map(p=>`<option value="${esc(p.name)}">`).join("")}</datalist><button>Send</button></form>
- <h2>Your items</h2>${inv.length?inv.map(([id,n])=>`<div class="card"><div class="e">${esc(items[id].emoji||"🎁")}</div><div class="i"><b>${esc(items[id].name)}</b></div><b>×${n}</b></div>`).join(""):'<div class="empty">Nothing yet. Visit the shop.</div>'}
+ <h2>Your items</h2>${inv.length?inv.map(([id,n])=>`<div class="card"><div class="e">${esc(items[id].emoji||"🎁")}</div><div class="i"><b>${esc(items[id].name)}</b>${kindTag(items[id])}</div><b>×${n}</b>${items[id].kind==="fun"?`<button class="ghost" data-toss="${id}">Get rid of</button>`:""}</div>`).join(""):'<div class="empty">Nothing yet. Visit the shop.</div>'}
  <h2>Richest cats</h2>${top.map((p,i)=>`<div class="card">${avHTML(p)}<div class="i"><b>${i+1}. ${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}</div><span class="price">🪙 ${isR(p)?"∞":p.coins}</span></div>`).join("")}`;
 }
 $("#p-wallet").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await pay(String(f.get("to")).trim(),parseInt(f.get("amt")));e.target.reset()}catch(x){}};
@@ -260,8 +261,11 @@ $("#p-settings").onchange=e=>{
  }
 };
 $("#p-wallet").onclick=async e=>{
- if(!("daily" in e.target.dataset))return;
- try{await api("daily");toast("+50 coins")}catch(x){}
+ const d=e.target.dataset;
+ try{
+  if("daily" in d){await api("daily");toast("+50 coins")}
+  else if(d.toss){await api("discard",{id:d.toss});toast("Gone!")}
+ }catch(x){}
 };
 
 function renderAdmin(){
@@ -270,7 +274,7 @@ function renderAdmin(){
  const ps=Object.entries(players).sort((a,b)=>a[1].name.localeCompare(b[1].name));
  box.innerHTML=`<h2>Add shop item</h2>
  <form id="af" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji" maxlength="4"><input name="name" placeholder="Item name" required maxlength="40"></div>
- <input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="1" placeholder="Price" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div><button>Add item</button></form>
+ <input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="1" placeholder="Price" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div><select name="kind" aria-label="Item type"><option value="normal">Regular item (collectible)</option><option value="physical">Real item (you hand it over yourself)</option><option value="fun">Just for fun (useless, they can get rid of it)</option></select><button>Add item</button></form>
  <h2>Items</h2>${Object.entries(items).map(([id,i])=>`<div class="card"><div class="e">${esc(i.emoji||"🎁")}</div><div class="i"><b>${esc(i.name)}</b><small>🪙 ${i.price}</small></div><button class="bad" data-rm="${id}">Remove</button></div>`).join("")||'<div class="empty">No items.</div>'}
  <h2>Players</h2>${ps.map(([id,p])=>{const R=meId===ROOT,self=id===ROOT;return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}${p.banned?'<span class="tag" style="background:var(--danger);color:#fff">banned</span>':""}<small>🪙 ${self?"∞":p.coins}</small></div>${self?"":`<button class="ghost" data-adm="${id}">${p.admin?"Remove admin":"Make admin"}</button>`}${R&&!self?`<div class="row" style="flex-basis:100%"><input type="number" placeholder="Coins (− takes)" data-amt="${id}"><button data-give="${id}">Give</button><button class="bad" data-ban="${id}">Ban &amp; delete</button></div>`:""}</div>`}).join("")}
  ${meId===ROOT&&(me().blocked||[]).length?`<h2>Banned names</h2>`+me().blocked.map(n=>`<div class="card"><div class="i"><b>${esc(n)}</b></div><button class="ghost" data-unban="${esc(n)}">Allow again</button></div>`).join(""):""}
@@ -278,7 +282,7 @@ function renderAdmin(){
 }
 $("#p-admin").onsubmit=async e=>{
  e.preventDefault();if(!isAdmin())return;const f=new FormData(e.target);
- try{await api("item/add",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),stock:f.get("stock")});e.target.reset();toast("Item added")}catch(x){}
+ try{await api("item/add",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),stock:f.get("stock"),kind:f.get("kind")});e.target.reset();toast("Item added")}catch(x){}
 };
 $("#p-admin").onclick=async e=>{
  if(!isAdmin())return;const d=e.target.dataset;
