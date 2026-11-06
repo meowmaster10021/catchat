@@ -17,7 +17,7 @@ const q=s=>db.prepare(s);
 
 // ---- persistence: the host's disk is wiped when the server sleeps, so the whole
 // database is copied to Supabase (one row) after changes and loaded back on startup.
-const SB_URL=(process.env.SUPABASE_URL||"").replace(/\/+$/,""),SB_KEY=process.env.SUPABASE_SERVICE_KEY||"",SB_ON=!!(SB_URL&&SB_KEY);
+const SB_URL=(process.env.SUPABASE_URL||"https://xuypsjiugzozzqosnacx.supabase.co/rest/v1/").replace(/\/+$/,""),SB_KEY=process.env.SUPABASE_SERVICE_KEY||"",SB_ON=!!(SB_URL&&SB_KEY);
 const TABLES=["players","items","messages","sessions","blocked"];
 const sb=(method,p,body)=>fetch(SB_URL+"/rest/v1/"+p,{method,headers:{apikey:SB_KEY,...(SB_KEY.startsWith("eyJ")?{Authorization:"Bearer "+SB_KEY}:{}),"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:body&&JSON.stringify(body)});
 const dump=()=>{const o={};for(const t of TABLES)o[t]=db.prepare("SELECT * FROM "+t).all();return o};
