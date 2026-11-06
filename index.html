@@ -217,7 +217,7 @@ function renderWallet(){
  const names=Object.values(players).filter(p=>p.name.toLowerCase()!==meId&&!p.banned);
  box.innerHTML=`<div class="set" style="text-align:center"><small style="color:var(--mute)">Your balance</small><div class="big-bal">🪙 ${R?"∞":m.coins}</div><button data-daily ${left>0?"disabled":""}>${left>0?`Daily bonus in ${Math.ceil(left/36e5)}h`:"Claim 50 daily coins"}</button></div>
  <h2>Send coins</h2><form id="payf" class="set"><div class="row"><input name="to" list="plist" placeholder="Player name" required maxlength="16" autocomplete="off"><input name="amt" type="number" min="1" placeholder="Amount" required></div><datalist id="plist">${names.map(p=>`<option value="${esc(p.name)}">`).join("")}</datalist><button>Send</button></form>
- <h2>Your items</h2>${inv.length?inv.map(([id,n])=>`<div class="card"><div class="e">${esc(items[id].emoji||"🎁")}</div><div class="i"><b>${esc(items[id].name)}</b>${kindTag(items[id])}</div><b>×${n}</b>${items[id].kind==="fun"?`<button class="ghost" data-toss="${id}">Get rid of</button>`:""}</div>`).join(""):'<div class="empty">Nothing yet. Visit the shop.</div>'}
+ <h2>Your items</h2>${inv.length?inv.map(([id,n])=>`<div class="card"><div class="e">${esc(items[id].emoji||"🎁")}</div><div class="i"><b>${esc(items[id].name)}</b>${kindTag(items[id])}</div><b>×${n}</b>${items[id].kind==="fun"?`<button class="ghost" data-toss="${id}">Get rid of</button>`:""}${(items[id].kind||"normal")==="normal"?`<button class="ghost" data-sell="${id}">Sell for 🪙 ${Math.floor(items[id].price*0.7)}</button>`:""}</div>`).join(""):'<div class="empty">Nothing yet. Visit the shop.</div>'}
  <h2>Richest cats</h2>${top.map((p,i)=>`<div class="card">${avHTML(p)}<div class="i"><b>${i+1}. ${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}</div><span class="price">🪙 ${isR(p)?"∞":p.coins}</span></div>`).join("")}`;
 }
 $("#p-wallet").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await pay(String(f.get("to")).trim(),parseInt(f.get("amt")));e.target.reset()}catch(x){}};
@@ -227,7 +227,8 @@ function renderSettings(){
  const a=m.avatar||defAv(m.name);
  const sw=(arr,k,cur)=>arr.map((c,i)=>`<button type="button" style="background:${c}" class="${cur===i?"on":""}" data-${k}="${i}" aria-label="${k} option ${i+1}"></button>`).join("");
  const opt=(arr,k,cur)=>arr.map((n,i)=>`<button type="button" class="${cur===i?"on":""}" data-${k}="${i}">${n}</button>`).join("");
- $("#p-settings").innerHTML=`<div class="set" style="justify-items:center;text-align:center">${avHTML({...m,avatar:a},true)}<b>${esc(m.name)}</b></div>
+ $("#p-settings").innerHTML=`${meId===ROOT?`<h2>Admin only</h2><div class="set"><div class="card" style="border:0;padding:0"><div class="i"><b>Infinite coins</b><small>Spend nothing and show ∞ on your balance. Only you can see this switch.</small></div><button class="${m.inf?"":"ghost"}" data-inf="${m.inf?0:1}">${m.inf?"On":"Off"}</button></div></div>`:""}
+ <div class="set" style="justify-items:center;text-align:center">${avHTML({...m,avatar:a},true)}<b>${esc(m.name)}</b></div>
  <h2>Profile picture</h2><div class="set"><div class="seg"><button type="button" class="${a.mode!=="photo"?"on":""}" data-mode="cat">Cartoon cat</button><button type="button" class="${a.mode==="photo"?"on":""}" data-mode="photo" ${a.photo?"":"disabled"}>My photo</button></div>
  <label>Upload a picture<input type="file" id="up" accept="image/*"></label>${a.photo?'<button type="button" class="ghost" data-rmphoto>Remove my photo</button>':""}</div>
  <h2>Customize your cat</h2><div class="set"><b>Fur</b><div class="sw">${sw(FUR,"fur",a.fur)}</div><b>Eyes</b><div class="sw">${sw(EYE,"eyes",a.eyes)}</div><b>Pattern</b><div class="seg">${opt(["Plain","Stripes","Patch","Muzzle"],"pat",a.pat)}</div><b>Accessory</b><div class="seg">${opt(["None","Bow","Crown","Glasses","Hat"],"acc",a.acc)}</div><button type="button" class="ghost" data-rand>Surprise me</button></div>
@@ -247,6 +248,7 @@ $("#p-settings").onclick=e=>{
  else if(d.acc!==undefined)saveAv({mode:"cat",acc:+d.acc});
  else if(d.rand!==undefined)saveAv({mode:"cat",fur:r(FUR.length),eyes:r(EYE.length),pat:r(PAT.length),acc:r(ACC.length)});
  else if(d.rmphoto!==undefined)saveAv({mode:"cat",photo:""});
+ else if(d.inf!==undefined&&meId===ROOT)api("infinite",{on:d.inf==="1"}).catch(()=>{});
  else if(d.delme!==undefined){const pw=prompt("This deletes your account, coins, items and messages for good.\n\nType your password to confirm:");if(pw)api("deleteMe",{pw}).then(()=>{logoutLocal();location.reload()}).catch(()=>{})}
 };
 $("#p-settings").onchange=e=>{
@@ -265,6 +267,7 @@ $("#p-wallet").onclick=async e=>{
  try{
   if("daily" in d){await api("daily");toast("+50 coins")}
   else if(d.toss){await api("discard",{id:d.toss});toast("Gone!")}
+  else if(d.sell){await api("sell",{id:d.sell});toast("Sold!")}
  }catch(x){}
 };
 
@@ -272,7 +275,7 @@ function renderAdmin(){
  const box=$("#p-admin");if(!isAdmin()){box.innerHTML="";return}
  if(box.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;
  const ps=Object.entries(players).sort((a,b)=>a[1].name.localeCompare(b[1].name));
- box.innerHTML=`<div class="card"><div class="i"><b>Infinite coins</b><small>Spend freely and show ∞ on your balance. Only admins have this switch.</small></div><button class="${me().inf?"":"ghost"}" data-inf="${me().inf?0:1}">${me().inf?"On":"Off"}</button></div>
+ box.innerHTML=`
  <h2>Add shop item</h2>
  <form id="af" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji" maxlength="4"><input name="name" placeholder="Item name" required maxlength="40"></div>
  <input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="1" placeholder="Price" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div><select name="kind" aria-label="Item type"><option value="normal">Regular item (collectible)</option><option value="physical">Real item (you hand it over yourself)</option><option value="fun">Just for fun (useless, they can get rid of it)</option></select><button>Add item</button></form>
@@ -288,8 +291,7 @@ $("#p-admin").onsubmit=async e=>{
 $("#p-admin").onclick=async e=>{
  if(!isAdmin())return;const d=e.target.dataset;
  try{
-  if(d.inf!==undefined)await api("infinite",{on:d.inf==="1"});
-  else if(d.rm)await api("item/remove",{id:d.rm});
+  if(d.rm)await api("item/remove",{id:d.rm});
   else if(d.adm)await api("admin/promote",{to:d.adm});
   else if(d.give&&meId===ROOT){const n=parseInt(document.querySelector(`[data-amt="${d.give}"]`).value);if(!n)return toast("Enter an amount");await api("admin/give",{to:d.give,n})}
   else if(d.ban&&meId===ROOT){if(confirm("Ban "+(players[d.ban]?players[d.ban].name:d.ban)+"? This deletes their account, coins and messages, and blocks the name."))await api("admin/ban",{to:d.ban})}
