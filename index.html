@@ -51,7 +51,7 @@ h2{margin:.2rem 0;font-size:1.05rem}
 #toast{position:fixed;left:50%;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.5em 1em;border-radius:10px;display:none;z-index:9}
 .tag{font-size:.75rem;background:var(--coin);color:#2b1d00;border-radius:6px;padding:0 .4em;margin-left:.3em}
 body[data-tab=chat] #p-chat{display:flex;flex-direction:column}
-body[data-tab=shop] #p-shop,body[data-tab=battle] #p-battle,body[data-tab=wallet] #p-wallet,body[data-tab=settings] #p-settings,body[data-tab=admin] #p-admin{display:grid}
+body[data-tab=shop] #p-shop,body[data-tab=battle] #p-battle,body[data-tab=trade] #p-trade,body[data-tab=wallet] #p-wallet,body[data-tab=settings] #p-settings,body[data-tab=admin] #p-admin{display:grid}
 .mw{display:flex;gap:.5rem;align-items:flex-end;max-width:92%}
 .mw.me{align-self:flex-end;flex-direction:row-reverse}
 .av{width:36px;height:36px;border-radius:50%;flex:none;background:var(--line);object-fit:cover;overflow:visible}
@@ -104,6 +104,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
    <form id="send"><input id="msg" placeholder="Message, or /pay name 25" autocomplete="off" maxlength="300"><button>Send</button></form></section>
   <section class="pane scroll" id="p-shop"></section>
   <section class="pane scroll" id="p-battle"></section>
+  <section class="pane scroll" id="p-trade"></section>
   <section class="pane scroll" id="p-wallet"></section>
   <section class="pane scroll" id="p-settings"></section>
   <section class="pane scroll" id="p-admin"></section>
@@ -184,7 +185,7 @@ function start(){
 }
 function setTab(t){
  tab=t;document.body.dataset.tab=t;
- const tabs=[["chat","Chat"],["shop","Shop"],["battle","Battle"],["wallet","Wallet"],["settings","Settings"]];if(isAdmin())tabs.push(["admin","Admin"]);
+ const tabs=[["chat","Chat"],["shop","Shop"],["battle","Battle"],["trade","Trade"],["wallet","Wallet"],["settings","Settings"]];if(isAdmin())tabs.push(["admin","Admin"]);
  $("#nav").innerHTML=tabs.map(([k,l])=>`<button class="${t===k?"on":""}" data-t="${k}">${l}</button>`).join("");
 }
 $("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)setTab(t)};
@@ -195,7 +196,7 @@ function renderAll(){
  if(!me())return;
  $("#bal").textContent="🪙 "+(meId===ROOT?"∞":me().coins);
  if(!isAdmin()&&tab==="admin")tab="shop";
- setTab(tab);renderChat();renderShop();renderBattle();renderWallet();renderSettings();renderAdmin();
+ setTab(tab);renderChat();renderShop();renderBattle();renderTrade();renderWallet();renderSettings();renderAdmin();
 }
 function renderChat(){
  const l=$("#log"),stick=l.scrollHeight-l.scrollTop-l.clientHeight<80;
@@ -215,12 +216,12 @@ $("#send").onsubmit=async e=>{
   await api("send",{text:t});
  }catch(x){}
 };
-async function pay(to,amt){await api("pay",{to,amt})}
+async function pay(to,amt){await api("pay",{to,amt});toast(`Sent ${amt} coins to ${to}`)}
 
 const MAX_SELL=5,ico=i=>i.img?`<img class="ico" src="${esc(i.img)}" alt="">`:`<div class="e">${esc(i.emoji||"🎁")}</div>`;
 function renderShop(){
  const box=$("#p-shop"),m=me();
- if(!$("#sf"))box.innerHTML=`<h2>Sell an item</h2><form id="sf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji (if no picture)" maxlength="4"><input name="name" placeholder="Item name" required maxlength="40"></div>${imgField("sell")}<input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="1" max="1000000" placeholder="Price" required><button>List for sale</button></div><small id="slots"></small><small id="fee"></small></form><h2>Shop</h2><div id="shoplist" style="display:grid;gap:.7rem"></div>`;
+ if(!$("#sf"))box.innerHTML=`<h2>Sell an item</h2><form id="sf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji (if no picture)" maxlength="4"><input name="name" placeholder="Item name" required maxlength="40"></div>${imgField("sell")}<input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="1" max="1000000" placeholder="Price" required><button>List for sale</button></div><small id="slots"></small><small id="fee"></small></form><h2>Shop</h2><div id="shoplist" style="display:grid;gap:.7rem"></div><h2>Cats</h2><div id="catlist" style="display:grid;gap:.7rem"></div>`;
  const mine=Object.values(items).filter(i=>i.seller===meId&&i.stock!==0).length,full=!isAdmin()&&mine>=MAX_SELL;
  $("#slots").textContent=isAdmin()?`${mine} listed · admins can sell unlimited items`:`${mine}/${MAX_SELL} items listed`;
  const pr=parseInt($("#sf [name=price]").value)||0;
@@ -230,6 +231,8 @@ function renderShop(){
  $("#shoplist").innerHTML=list.length?list.map(([id,i])=>{
   const out=i.stock===0,own=i.seller===meId,poor=m&&!m.inf&&m.coins<i.price,sp=i.seller&&players[i.seller];
   return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}<small>${esc(i.desc||"")}${i.stock>0&&!i.seller?` · ${i.stock} left`:""}</small>${i.seller?`<small>Sold by ${esc(sp?sp.name:"a cat")}</small>`:""}<span class="price">🪙 ${i.price}</span></div>${own?`<button class="ghost" data-cancel="${id}">Cancel</button>`:`<button data-buy="${id}" ${out||poor?"disabled":""}>${out?"Sold out":"Buy"}</button>`}</div>`}).join(""):`<div class="empty">Nothing for sale yet. List the first item above!</div>`;
+ const oc=m.cats||[];
+ $("#catlist").innerHTML=Object.values(cats).map(c=>{const has=oc.includes(c.id),poor=!m.inf&&m.coins<c.price;return `<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b><small>${c.hp} HP</small><span class="price">${c.price?"🪙 "+c.price:"Free"}</span></div><button data-bcat="${c.id}" ${has||poor?"disabled":""}>${has?"Owned":c.price?"Buy":"Get"}</button></div>`}).join("")||'<div class="empty">No cats for sale yet.</div>';
 }
 $("#p-shop").oninput=e=>{if(e.target.name==="price")renderShop()};
 $("#p-shop").onclick=async e=>{
@@ -237,6 +240,7 @@ $("#p-shop").onclick=async e=>{
  try{
   if(d.buy){await api("buy",{id:d.buy});toast("Bought "+(items[d.buy]?items[d.buy].name:"item"))}
   else if(d.cancel){await api("item/cancel",{id:d.cancel});toast("Listing cancelled")}
+  else if(d.bcat){await api("cat/buy",{id:d.bcat});toast("Cat added to your collection")}
  }catch(x){}
 };
 $("#p-shop").onsubmit=async e=>{
@@ -314,8 +318,8 @@ function renderAdmin(){
  <input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="1" placeholder="Price" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div>
  <select name="kind"><option value="normal">Normal item (can be sold back)</option><option value="fun">Fun item (can be thrown away)</option><option value="physical">Real item (a real prize)</option></select><button>Add item</button></form>
  <h2>Items</h2>${Object.entries(items).map(([id,i])=>`<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b><small>🪙 ${i.price}${i.seller?" · player listing":""}</small></div><button class="bad" data-rm="${id}">Remove</button></div>`).join("")||'<div class="empty">No items.</div>'}
- <h2>Create a cat</h2><form id="cf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Cat name" required maxlength="30"><input name="hp" type="number" min="1" max="9999" placeholder="HP (like 50)" required></div>${imgField("cat")}<button>Create cat</button></form>
- ${Object.values(cats).map(c=>`<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b><small>${c.hp} HP</small></div><button class="bad" data-rmcat="${c.id}">Remove</button></div>`).join("")}
+ <h2>Create a cat</h2><form id="cf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Cat name" required maxlength="30"><input name="hp" type="number" min="1" max="9999" placeholder="HP (like 50)" required><input name="price" type="number" min="0" placeholder="Price (0 = free)"></div>${imgField("cat")}<button>Create cat</button></form>
+ ${Object.values(cats).map(c=>`<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b><small>${c.hp} HP · ${c.price?"🪙 "+c.price:"free"}</small></div><button class="bad" data-rmcat="${c.id}">Remove</button></div>`).join("")}
  <h2>Create an ability</h2><form id="mf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Ability name" required maxlength="30"><input name="damage" type="number" min="1" max="999" placeholder="Damage" required><input name="price" type="number" min="0" placeholder="Price (0 = free)" required></div>
  <div class="row" style="align-items:center">${animSel}<button type="button" class="ghost" data-pvbtn>Preview animation</button><div class="fi" data-pid="__pv" style="flex:none;min-width:70px;width:70px"><div class="noimg" style="width:70px;height:70px;font-size:2rem">🐱</div><span class="fx"></span></div></div><button>Create ability</button></form>
  ${Object.values(moves).map(k=>`<div class="card"><div class="i"><b>${esc(k.name)}</b><small>${k.damage} damage · ${esc(k.anim)} · 🪙 ${k.price}</small></div><button class="bad" data-rmmove="${k.id}">Remove</button></div>`).join("")}
@@ -327,7 +331,7 @@ $("#p-admin").onsubmit=async e=>{
  e.preventDefault();if(!isAdmin())return;const f=new FormData(e.target),id=e.target.id;
  try{
   if(id==="af"){await api("item/add",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),stock:f.get("stock"),kind:f.get("kind"),img:imgs.item});setImg("item","");toast("Item added")}
-  else if(id==="cf"){await api("cat/add",{name:f.get("name"),hp:f.get("hp"),img:imgs.cat});setImg("cat","");toast("Cat created")}
+  else if(id==="cf"){await api("cat/add",{name:f.get("name"),hp:f.get("hp"),price:f.get("price"),img:imgs.cat});setImg("cat","");toast("Cat created")}
   else if(id==="mf"){await api("move/add",{name:f.get("name"),damage:f.get("damage"),price:f.get("price"),anim:f.get("anim")});toast("Ability created")}
   e.target.reset();
  }catch(x){}
@@ -370,15 +374,45 @@ $("#dsw").innerHTML=["#000","#d64550","#e8a400","#0f9d73","#4aa3ff","#b07cff","#
 $("#dlg").onclick=e=>{const d=e.target.dataset;if(d.pen)pen=d.pen;else if(d.d==="clear")clr();else if(d.d==="cancel")$("#dlg").close();else if(d.d==="use"){setImg(dk,cv.toDataURL("image/jpeg",.8));$("#dlg").close()}};
 document.addEventListener("click",e=>{const k=e.target.dataset&&e.target.dataset.draw;if(k){dk=k;clr();$("#dlg").showModal()}});
 
+// ---- trading (items and cats only)
+let tr={to:"",gi:{},gc:[],wi:{},wc:[]},tsig="";
+const nm=id=>players[id]?esc(players[id].name):"someone";
+const fmt=t=>[...Object.entries(t.items).map(([id,n])=>`${items[id]?esc(items[id].name):"an item"} ×${n}`),...t.cats.map(id=>`${cats[id]?esc(cats[id].name):"a cat"} (cat)`)].join(", ")||"nothing";
+function renderTrade(){
+ const m=me(),box=$("#p-trade");if(!m)return;
+ const others=Object.values(players).filter(p=>p.id!==meId&&!p.banned);
+ if(!others.find(p=>p.id===tr.to))tr.to=others[0]?others[0].id:"";
+ const o=players[tr.to],sg=JSON.stringify([m.trades,m.inv,m.cats,Object.keys(cats),Object.keys(items),o&&[o.inv,o.cats],others.length]);
+ if(sg===tsig)return;tsig=sg;
+ const rowsI=(inv,k)=>Object.entries(inv||{}).filter(([id])=>items[id]).map(([id,n])=>`<div class="row" style="align-items:center"><span>${esc(items[id].name)} (has ${n})</span><input type="number" min="0" max="${n}" value="${tr[k][id]||0}" data-${k}="${id}" style="max-width:90px"></div>`).join("");
+ const rowsC=(own,k)=>(own||[]).filter(id=>cats[id]).map(id=>`<label class="t"><input type="checkbox" data-${k}="${id}" ${tr[k].includes(id)?"checked":""}>${esc(cats[id].name)} (cat)</label>`).join("");
+ const open=(m.trades||[]).map(t=>t.to===meId?`<div class="card" style="flex-wrap:wrap"><div class="i"><b>${nm(t.from)}</b> gives you ${fmt(t.give)}<small>and wants ${fmt(t.want)}</small></div><button data-tacc="${t.id}">Accept</button><button class="ghost" data-tcan="${t.id}">Decline</button></div>`:`<div class="card" style="flex-wrap:wrap"><div class="i">You give ${nm(t.to)} ${fmt(t.give)}<small>for ${fmt(t.want)}</small></div><button class="ghost" data-tcan="${t.id}">Cancel</button></div>`).join("");
+ box.innerHTML=`<h2>Offers</h2>${open||'<div class="empty">No open offers.</div>'}<h2>Trade with someone</h2>${o?`<div class="set"><select data-tp>${others.map(p=>`<option value="${esc(p.id)}" ${p.id===tr.to?"selected":""}>${esc(p.name)}</option>`).join("")}</select><b>You give</b>${rowsI(m.inv,"gi")+rowsC(m.cats,"gc")||"<small>You have nothing yet.</small>"}<b>You want from ${esc(o.name)}</b>${rowsI(o.inv,"wi")+rowsC(o.cats,"wc")||"<small>They have nothing yet.</small>"}<button data-offer>Send offer</button></div>`:'<div class="empty">Nobody else is here yet.</div>'}`;
+}
+$("#p-trade").onchange=$("#p-trade").oninput=e=>{
+ const d=e.target.dataset,v=e.target;
+ if(d.tp!==undefined){tr={to:v.value,gi:{},gc:[],wi:{},wc:[]};tsig="";renderTrade();return}
+ for(const k of["gi","wi"])if(d[k]!==undefined)tr[k][d[k]]=Math.max(0,parseInt(v.value)||0);
+ for(const k of["gc","wc"])if(d[k]!==undefined){const id=+d[k];tr[k]=v.checked?[...tr[k].filter(x=>x!==id),id]:tr[k].filter(x=>x!==id)}
+};
+$("#p-trade").onclick=async e=>{
+ const d=e.target.dataset,pick=o=>Object.fromEntries(Object.entries(o).filter(([,n])=>n>0));
+ try{
+  if("offer" in d){await api("trade/offer",{to:tr.to,give:{items:pick(tr.gi),cats:tr.gc},want:{items:pick(tr.wi),cats:tr.wc}});tr={to:tr.to,gi:{},gc:[],wi:{},wc:[]};tsig="";toast("Offer sent")}
+  else if(d.tacc){await api("trade/accept",{id:d.tacc});toast("Trade done")}
+  else if(d.tcan)await api("trade/cancel",{id:d.tcan});
+ }catch(x){}
+};
+
 // ---- cat battles
 const seen={};let sel={cat:"",to:""},sig="";
 function play(pid,a){const f=document.querySelector(`.fi[data-pid="${pid}"]`);if(!f)return;const x=f.querySelector(".fx");f.classList.remove("hit");x.className="fx";void f.offsetWidth;x.className="fx "+a;f.classList.add("hit");setTimeout(()=>{x.className="fx";f.classList.remove("hit")},1000)}
 const fighter=f=>`<div class="fi" data-pid="${esc(f.pid)}"><b>${esc(f.name)}’s ${esc(f.cat.name)}</b>${f.cat.img?`<img src="${esc(f.cat.img)}" alt="">`:'<div class="noimg">🐱</div>'}<div class="hp"><i style="width:${f.cat.max?Math.round(100*f.hp/f.cat.max):0}%"></i></div><small>${f.hp} / ${f.cat.max} HP</small><span class="fx"></span></div>`;
 function renderBattle(){
  const box=$("#p-battle"),m=me();if(!m)return;
- const b=m.battle,sg=JSON.stringify([b&&[b.id,b.state,b.n],Object.keys(cats),Object.keys(moves),m.moves,m.coins,Object.keys(players).length]);
+ const b=m.battle,sg=JSON.stringify([b&&[b.id,b.state,b.n],Object.keys(cats),Object.keys(moves),m.moves,m.cats,m.coins,Object.keys(players).length]);
  if(sg===sig)return;sig=sg;
- const catOpts=Object.values(cats).map(c=>`<option value="${c.id}" ${String(c.id)===sel.cat?"selected":""}>${esc(c.name)} · ${c.hp} HP</option>`).join("");
+ const catOpts=Object.values(cats).filter(c=>(m.cats||[]).includes(c.id)).map(c=>`<option value="${c.id}" ${String(c.id)===sel.cat?"selected":""}>${esc(c.name)} · ${c.hp} HP</option>`).join("");
  let h="";
  if(b&&b.state==="pending"){
   h=b.a.pid===meId?`<div class="set"><b>Waiting for ${esc(b.b.name)} to accept…</b><button class="ghost" data-leave>Cancel challenge</button></div>`
@@ -391,7 +425,7 @@ function renderBattle(){
   <small>${b.log.map(esc).join("<br>")}</small><button class="ghost" data-leave>${b.state==="done"?"Close":"Give up"}</button></div>`;
  }else{
   const others=Object.values(players).filter(p=>p.id!==meId&&!p.banned);
-  h=`<h2>Challenge a player</h2>${catOpts?`<div class="set"><select name="cat">${catOpts}</select><select name="to">${others.map(p=>`<option value="${esc(p.id)}" ${p.id===sel.to?"selected":""}>${esc(p.name)}</option>`).join("")}</select><button data-ch>Challenge</button></div>`:'<div class="empty">No cats yet. An admin has to create some first.</div>'}
+  h=`<h2>Challenge a player</h2>${catOpts?`<div class="set"><select name="cat">${catOpts}</select><select name="to">${others.map(p=>`<option value="${esc(p.id)}" ${p.id===sel.to?"selected":""}>${esc(p.name)}</option>`).join("")}</select><button data-ch>Challenge</button></div>`:'<div class="empty">You need a cat first. Get one in the Shop tab.</div>'}
   <h2>Abilities for sale</h2>${Object.values(moves).map(k=>{const own=(m.moves||[]).includes(k.id),poor=!m.inf&&m.coins<k.price;return `<div class="card"><div class="i"><b>${esc(k.name)}</b><small>${k.damage} damage · ${esc(k.anim)}</small><span class="price">🪙 ${k.price}</span></div><button data-bm="${k.id}" ${own||poor?"disabled":""}>${own?"Learned":"Buy"}</button></div>`}).join("")||'<div class="empty">No abilities for sale yet.</div>'}
   <small style="color:var(--mute)">Everyone starts with a free Scratch (10 damage).</small>`;
  }
