@@ -136,17 +136,19 @@ const actions={
   if(!i)bad("That item is gone");if(i.stock===0)bad("Sold out");if(i.seller&&i.seller===p.id)bad("You can’t buy your own item");if(!inf(p)&&p.coins<i.price)bad("Not enough coins");
   const inv=JSON.parse(p.inv);inv[i.id]=(inv[i.id]||0)+1;
   q("UPDATE players SET coins=coins-?,inv=? WHERE id=?").run(inf(p)?0:i.price,JSON.stringify(inv),p.id);
-  const sl=i.seller?find(i.seller):null;if(sl)q("UPDATE players SET coins=coins+? WHERE id=?").run(i.price,sl.id);
+  const sl=i.seller?find(i.seller):null;if(sl)q("UPDATE players SET coins=coins+? WHERE id=?").run(Math.floor(i.price*(i.stock<0?0.05:0.5)),sl.id);
   if(i.stock>0)q("UPDATE items SET stock=stock-1 WHERE id=?").run(i.id);
   post(p.name,`${p.name} bought ${i.emoji} ${i.name}${i.kind==="physical"?" (a real one!)":""}${sl?` from ${sl.name}`:""}`)},
  "item/sell"(p,b){const name=String(b.name||"").trim().slice(0,40);if(!name)bad("Give your item a name");
   const price=parseInt(b.price);if(!(price>=1&&price<=1e6))bad("Price must be between 1 and 1,000,000");
   if(!p.admin&&q("SELECT COUNT(*) c FROM items WHERE seller=? AND stock!=0").get(p.id).c>=MAX_SELL)bad(`You can only have ${MAX_SELL} items for sale at once`);
-  const fee=p.admin?0:Math.ceil(price*0.2);
+  const qty=b.qty===""||b.qty===null?-1:Math.min(99,Math.max(1,parseInt(b.qty)||1)),fee=p.admin?0:Math.ceil(price*(qty<0?1:qty)*0.2);
   if(fee){if(p.coins<fee)bad(`Listing this costs ${fee} coins (20% of the price)`);q("UPDATE players SET coins=coins-? WHERE id=?").run(fee,p.id)}
-  q("INSERT INTO items(name,emoji,descr,price,stock,kind,seller,img) VALUES(?,?,?,?,1,'normal',?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),price,p.id,imgOk(b.img))},
+  q("INSERT INTO items(name,emoji,descr,price,stock,kind,seller,img) VALUES(?,?,?,?,?,'normal',?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),price,qty,p.id,imgOk(b.img))},
  "item/cancel"(p,b){const i=q("SELECT * FROM items WHERE id=?").get(parseInt(b.id));
-  if(!i||i.seller!==p.id||i.stock===0)bad("You can’t cancel that");q("DELETE FROM items WHERE id=?").run(i.id)},
+  if(!i||i.seller!==p.id||i.stock===0)bad("You can’t cancel that");
+  const sold=q("SELECT inv FROM players").all().some(r=>JSON.parse(r.inv||"{}")[i.id]>0);
+  if(sold)q("UPDATE items SET stock=0 WHERE id=?").run(i.id);else q("DELETE FROM items WHERE id=?").run(i.id)},
  avatar(p,b){
   const a={mode:b.mode==="photo"?"photo":"cat",fur:clamp(b.fur,8),eyes:clamp(b.eyes,5),pat:clamp(b.pat,4),acc:clamp(b.acc,5)};
   let photo=p.photo,pv=p.pv;
@@ -169,9 +171,9 @@ const actions={
   if(--inv[i.id]<=0)delete inv[i.id];
   q("UPDATE players SET inv=? WHERE id=?").run(JSON.stringify(inv),p.id);post(p.name,`${p.name} got rid of a ${i.emoji} ${i.name}`)},
  infinite(p,b){root(p);q("UPDATE players SET infinite=? WHERE id=?").run(b.on?1:0,p.id)},
- "item/add"(p,b){adm(p);const name=String(b.name||"").trim().slice(0,40);if(!name)bad("Give the item a name");
+ "item/add"(p,b){adm(p);const pr=parseInt(b.price);if(!(pr>=0&&pr<=1e6))bad("Enter a price (0 for a free item)");const name=String(b.name||"").trim().slice(0,40);if(!name)bad("Give the item a name");
   const st=parseInt(b.stock);
-  q("INSERT INTO items(name,emoji,descr,price,stock,kind,img) VALUES(?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),Math.max(1,parseInt(b.price)||1),st>0?st:-1,["physical","fun"].includes(b.kind)?b.kind:"normal",imgOk(b.img))},
+  q("INSERT INTO items(name,emoji,descr,price,stock,kind,img) VALUES(?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),pr,st>0?st:-1,["physical","fun"].includes(b.kind)?b.kind:"normal",imgOk(b.img))},
  "cat/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the cat a name");
   q("INSERT INTO cats(name,img,hp,price) VALUES(?,?,?,?)").run(n,imgOk(b.img),Math.min(9999,Math.max(1,parseInt(b.hp)||50)),Math.max(0,parseInt(b.price)||0))},
  "cat/buy"(p,b){const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.id));if(!c)bad("That cat is gone");
