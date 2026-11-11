@@ -1,7 +1,7 @@
 const http=require("node:http"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
 const {DatabaseSync}=require("node:sqlite");
 const ROOT="meowmaster100",PORT=+process.env.PORT||8080,DATA=process.env.DATA_DIR||"/tmp/catchat";
-const ADMIN_PW=process.env.ADMIN_PASSWORD||"110921-fury";
+const ADMIN_PW=process.env.ADMIN_PASSWORD||"";
 if(ADMIN_PW.length<6){console.error("Set ADMIN_PASSWORD (6+ characters), add it under Environment on your host");process.exit(1)}
 fs.mkdirSync(DATA,{recursive:true});
 const db=new DatabaseSync(path.join(DATA,"meow.db"));
@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS cats(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,i
 CREATE TABLE IF NOT EXISTS moves(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,damage INTEGER,anim TEXT,price INTEGER);`);
 try{db.exec("ALTER TABLE items ADD COLUMN img TEXT DEFAULT ''")}catch(e){}
 try{db.exec("ALTER TABLE players ADD COLUMN moves TEXT DEFAULT '[]'")}catch(e){}
+try{db.exec("ALTER TABLE players ADD COLUMN cats TEXT DEFAULT '[]'")}catch(e){}
+try{db.exec("ALTER TABLE cats ADD COLUMN price INTEGER DEFAULT 0")}catch(e){}
 try{db.exec("ALTER TABLE items ADD COLUMN kind TEXT DEFAULT 'normal'")}catch(e){}
 try{db.exec("ALTER TABLE players ADD COLUMN infinite INTEGER DEFAULT 0");db.exec("UPDATE players SET infinite=1 WHERE id='meowmaster100'")}catch(e){}
 try{db.exec("ALTER TABLE items ADD COLUMN seller TEXT DEFAULT ''")}catch(e){}
@@ -58,6 +60,7 @@ process.on("SIGTERM",bye);process.on("SIGINT",bye);
 
 (async()=>{
 await restore();
+q("DELETE FROM messages WHERE sys=1").run();
 const hashPw=(pw,salt)=>crypto.scryptSync(pw,salt,32).toString("hex");
 const same=(a,b)=>{const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&crypto.timingSafeEqual(x,y)};
 class E extends Error{}
@@ -103,19 +106,24 @@ function auth(req,url){
 
 // ---- game logic: every rule is enforced here, not in the page
 const clamp=(v,n)=>Math.max(0,Math.min(n-1,parseInt(v)||0));
-const post=(name,text,sys=1)=>q("INSERT INTO messages(name,text,ts,sys) VALUES(?,?,?,?)").run(name,text,Date.now(),sys);
+const post=(name,text,sys=1)=>{if(sys)return;q("INSERT INTO messages(name,text,ts,sys) VALUES(?,?,?,?)").run(name,text,Date.now(),0)};
 const adm=p=>{if(!p.admin)bad("Admins only")},root=p=>{if(p.id!==ROOT)bad("Only "+ROOT+" can do that")};
 const inf=p=>p.id===ROOT&&!!p.infinite;
 const ANIMS=["slash","fire","water","bolt","star","claw"],SCRATCH={id:0,name:"Scratch",damage:10,anim:"slash"};
 const imgOk=v=>typeof v==="string"&&v.length<80000&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(v)?v:"";
-const battles=new Map();let bid=0;
+const battles=new Map();let bid=0;const trades=new Map();let tid=0;
 const inBattle=id=>[...battles.values()].find(x=>x.a.pid===id||x.b.pid===id);
 const ft=(pl,c)=>({pid:pl.id,name:pl.name,cat:{id:c.id,name:c.name,img:c.img?`/img/cat/${c.id}`:"",max:c.hp},hp:c.hp});
 const wipe=id=>{q("DELETE FROM items WHERE seller=? AND stock!=0").run(id);q("DELETE FROM sessions WHERE pid=?").run(id);
  for(const[k,x]of battles)if(x.a.pid===id||x.b.pid===id)battles.delete(k);
+ for(const[k,x]of trades)if(x.from===id||x.to===id)trades.delete(k);
  const re=new RegExp("(^|[^A-Za-z0-9_])"+id+"($|[^A-Za-z0-9_])","i");
  for(const m of q("SELECT id,name,text,sys FROM messages").all())if(String(m.name).toLowerCase()===id||(m.sys&&re.test(m.text)))q("DELETE FROM messages WHERE id=?").run(m.id);
  q("DELETE FROM players WHERE id=?").run(id)};
+const normT=v=>{const it={};for(const[k,n]of Object.entries((v&&v.items)||{}).slice(0,10)){const id=parseInt(k),c=parseInt(n);if(id>0&&c>0)it[id]=Math.min(c,99)}
+ return{items:it,cats:[...new Set(((v&&v.cats)||[]).map(x=>parseInt(x)).filter(x=>x>0))].slice(0,10)}};
+const empty=t=>!Object.keys(t.items).length&&!t.cats.length;
+const owns=(pl,t)=>{const inv=JSON.parse(pl.inv),own=JSON.parse(pl.cats||"[]");return Object.entries(t.items).every(([id,n])=>(inv[id]||0)>=n)&&t.cats.every(id=>own.includes(id))};
 const actions={
  send(p,b){const t=String(b.text||"").trim().slice(0,300);if(!t)bad("Empty message");
   if(Date.now()-(lastMsg.get(p.id)||0)<500)bad("Slow down");lastMsg.set(p.id,Date.now());post(p.name,t,0)},
@@ -165,7 +173,11 @@ const actions={
   const st=parseInt(b.stock);
   q("INSERT INTO items(name,emoji,descr,price,stock,kind,img) VALUES(?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),Math.max(1,parseInt(b.price)||1),st>0?st:-1,["physical","fun"].includes(b.kind)?b.kind:"normal",imgOk(b.img))},
  "cat/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the cat a name");
-  q("INSERT INTO cats(name,img,hp) VALUES(?,?,?)").run(n,imgOk(b.img),Math.min(9999,Math.max(1,parseInt(b.hp)||50)))},
+  q("INSERT INTO cats(name,img,hp,price) VALUES(?,?,?,?)").run(n,imgOk(b.img),Math.min(9999,Math.max(1,parseInt(b.hp)||50)),Math.max(0,parseInt(b.price)||0))},
+ "cat/buy"(p,b){const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.id));if(!c)bad("That cat is gone");
+  const own=JSON.parse(p.cats||"[]");if(own.includes(c.id))bad("You already have that cat");
+  if(!inf(p)&&p.coins<c.price)bad("Not enough coins");own.push(c.id);
+  q("UPDATE players SET coins=coins-?,cats=? WHERE id=?").run(inf(p)?0:c.price,JSON.stringify(own),p.id)},
  "cat/remove"(p,b){adm(p);q("DELETE FROM cats WHERE id=?").run(parseInt(b.id))},
  "move/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the ability a name");
   q("INSERT INTO moves(name,damage,anim,price) VALUES(?,?,?,?)").run(n,Math.min(999,Math.max(1,parseInt(b.damage)||10)),ANIMS.includes(b.anim)?b.anim:"slash",Math.max(0,parseInt(b.price)||0))},
@@ -176,11 +188,13 @@ const actions={
   q("UPDATE players SET coins=coins-?,moves=? WHERE id=?").run(inf(p)?0:m.price,JSON.stringify(own),p.id);post(p.name,`${p.name} learned ${m.name}`)},
  "battle/challenge"(p,b){const t=find(b.to),c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.cat));
   if(!t||t.banned||t.id===p.id)bad("Pick another player");if(!c)bad("Pick your cat");
+  if(!JSON.parse(p.cats||"[]").includes(c.id))bad("You don’t own that cat");
   if(inBattle(p.id)||inBattle(t.id))bad("One of you is already in a battle");
   battles.set(++bid,{id:bid,state:"pending",a:ft(p,c),b:{pid:t.id,name:t.name,cat:null,hp:0},turn:"a",n:0,last:null,log:[],ts:Date.now()});
   post(p.name,`${p.name} challenged ${t.name} to a cat battle`)},
  "battle/accept"(p,b){const x=battles.get(parseInt(b.id)),c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.cat));
   if(!x||x.state!=="pending"||x.b.pid!==p.id)bad("No challenge to accept");if(!c)bad("Pick your cat");
+  if(!JSON.parse(p.cats||"[]").includes(c.id))bad("You don’t own that cat");
   x.b=ft(p,c);x.state="active";x.ts=Date.now()},
  "battle/move"(p,b){const x=battles.get(parseInt(b.id));if(!x||x.state!=="active")bad("No active battle");
   const me=x[x.turn];if(me.pid!==p.id)bad("It’s not your turn");
@@ -191,6 +205,23 @@ const actions={
   if(o.hp<=0){x.state="done";x.winner=me.pid;post(p.name,`${me.name}’s ${me.cat.name} beat ${o.name}’s ${o.cat.name} in a cat battle`)}else x.turn=x.turn==="a"?"b":"a"},
  "battle/leave"(p){const x=inBattle(p.id);if(!x)bad("You’re not in a battle");
   if(x.state==="active"){x.state="done";x.winner=x.a.pid===p.id?x.b.pid:x.a.pid;x.log=[...x.log,`${p.name} gave up`].slice(-6);x.n++}else battles.delete(x.id)},
+ "trade/offer"(p,b){const t=find(b.to);if(!t||t.banned||t.id===p.id)bad("Pick another player");
+  const give=normT(b.give),want=normT(b.want);if(empty(give)&&empty(want))bad("Pick something to trade");
+  if(!owns(p,give))bad("You don’t have everything you’re offering");if(!owns(t,want))bad(`${t.name} doesn’t have everything you asked for`);
+  if(give.cats.some(id=>JSON.parse(t.cats||"[]").includes(id))||want.cats.some(id=>JSON.parse(p.cats||"[]").includes(id)))bad("You can only own one of each cat");
+  if([...trades.values()].filter(x=>x.from===p.id).length>=3)bad("You already have 3 open offers");
+  trades.set(++tid,{id:tid,from:p.id,to:t.id,give,want,ts:Date.now()})},
+ "trade/accept"(p,b){const x=trades.get(parseInt(b.id));if(!x||x.to!==p.id)bad("That offer is gone");
+  const a=find(x.from);if(!a||a.banned){trades.delete(x.id);bad("That offer is gone")}
+  if(!owns(a,x.give)||!owns(p,x.want))bad("The trade can’t happen anymore, someone no longer has everything");
+  const ia=JSON.parse(a.inv),ib=JSON.parse(p.inv),ca=JSON.parse(a.cats||"[]"),cb=JSON.parse(p.cats||"[]");
+  if(x.give.cats.some(id=>cb.includes(id))||x.want.cats.some(id=>ca.includes(id)))bad("You can only own one of each cat");
+  const mv=(f,g,t)=>{for(const[id,n]of Object.entries(t)){f[id]-=n;if(f[id]<=0)delete f[id];g[id]=(g[id]||0)+n}};
+  mv(ia,ib,x.give.items);mv(ib,ia,x.want.items);
+  const na=ca.filter(id=>!x.give.cats.includes(id)).concat(x.want.cats),nb=cb.filter(id=>!x.want.cats.includes(id)).concat(x.give.cats);
+  q("UPDATE players SET inv=?,cats=? WHERE id=?").run(JSON.stringify(ia),JSON.stringify(na),a.id);
+  q("UPDATE players SET inv=?,cats=? WHERE id=?").run(JSON.stringify(ib),JSON.stringify(nb),p.id);trades.delete(x.id)},
+ "trade/cancel"(p,b){const x=trades.get(parseInt(b.id));if(!x||(x.from!==p.id&&x.to!==p.id))bad("That offer is gone");trades.delete(x.id)},
  "item/remove"(p,b){adm(p);q("DELETE FROM items WHERE id=?").run(parseInt(b.id))},
  "admin/promote"(p,b){adm(p);const t=find(b.to);if(!t||t.id===ROOT)bad("You can’t change that player");
   q("UPDATE players SET admin=? WHERE id=?").run(t.admin?0:1,t.id);post(p.name,`${t.name} ${t.admin?"is no longer":"is now"} an admin`)},
@@ -210,18 +241,18 @@ function tx(fn){db.exec("BEGIN");try{const r=fn();db.exec("COMMIT");return r}cat
 // ---- live updates (Server-Sent Events)
 const clients=new Set();
 const pub=p=>{const a=JSON.parse(p.avatar||"{}");
- return{id:p.id,name:p.name,coins:p.coins,admin:!!p.admin,banned:!!p.banned,inf:p.id===ROOT&&!!p.infinite,avatar:Object.keys(a).length?{...a,photo:p.photo?`/avatar/${p.id}?v=${p.pv}`:""}:undefined}};
+ return{id:p.id,name:p.name,coins:p.coins,inv:JSON.parse(p.inv||"{}"),cats:JSON.parse(p.cats||"[]"),admin:!!p.admin,banned:!!p.banned,inf:p.id===ROOT&&!!p.infinite,avatar:Object.keys(a).length?{...a,photo:p.photo?`/avatar/${p.id}?v=${p.pv}`:""}:undefined}};
 const snapshot=()=>JSON.stringify({
  players:q("SELECT * FROM players").all().map(pub),
  items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal",seller:i.seller||"",img:i.img?`/img/item/${i.id}`:""})),
- cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,img:c.img?`/img/cat/${c.id}`:""})),
+ cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,price:c.price||0,img:c.img?`/img/cat/${c.id}`:""})),
  moves:q("SELECT * FROM moves").all(),
  messages:q("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all()});
 function sendTo(c,base){const m=find(c.pid);if(!m)return;
- c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),daily:m.daily,moves:JSON.parse(m.moves||"[]"),battle:inBattle(m.id)||null,blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined})+"}\n\n")}
+ c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),daily:m.daily,moves:JSON.parse(m.moves||"[]"),battle:inBattle(m.id)||null,trades:[...trades.values()].filter(x=>x.from===m.id||x.to===m.id).map(({id,from,to,give,want})=>({id,from,to,give,want})),blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined})+"}\n\n")}
 function push(){scheduleSave();if(!clients.size)return;const base=snapshot();for(const c of clients)sendTo(c,base)}
 setInterval(()=>{for(const c of clients)c.res.write(": ping\n\n")},25000);
-setInterval(()=>{let d=0;for(const[k,x]of battles)if(Date.now()-x.ts>9e5){battles.delete(k);d=1}if(d)push()},60000);
+setInterval(()=>{let d=0;for(const[k,x]of trades)if(Date.now()-x.ts>18e5){trades.delete(k);d=1}for(const[k,x]of battles)if(Date.now()-x.ts>9e5){battles.delete(k);d=1}if(d)push()},60000);
 
 // ---- http
 const INDEX=fs.readFileSync(path.join(__dirname,"index.html"));
