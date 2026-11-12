@@ -358,6 +358,7 @@ function renderAdmin(){
  ${Object.values(moves).map(k=>`<div class="card"><div class="i"><b>${esc(k.name)}</b><small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)} · 🪙 ${k.price}</small></div><button class="bad" data-rmmove="${k.id}">Remove</button></div>`).join("")}
  <h2>Players</h2>${ps.map(([id,p])=>{const self=id===ROOT;return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}<small>🪙 ${p.inf?"∞":p.coins}</small></div>${self?"":`<button class="ghost" data-adm="${id}">${p.admin?"Remove admin":"Make admin"}</button>`}${R&&!self?`<div class="row" style="flex-basis:100%"><input type="number" placeholder="Coins (− takes)" data-amt="${id}"><button data-give="${id}">Give</button><button class="bad" data-ban="${id}">Ban + delete</button></div>`:""}</div>`}).join("")}
  ${R?`<button class="ghost" data-inf>${me().inf?"Turn infinite coins off":"Turn infinite coins on"}</button>${blk.length?`<h2>Banned names</h2>${blk.map(id=>`<div class="card"><div class="i"><b>${esc(id)}</b></div><button class="ghost" data-unban="${esc(id)}">Let them sign up again</button></div>`).join("")}`:""}`:""}
+ <h2>Banned username words</h2><form id="wf" class="card" style="display:flex;gap:.5rem;flex-wrap:wrap"><input name="w" placeholder="Word to block in usernames" maxlength="16" required><button>Ban word</button></form>${(me().words||[]).map(w=>`<div class="card"><div class="i"><b>${esc(w)}</b></div><button class="ghost" data-unw="${esc(w)}">Remove</button></div>`).join("")}
  <h2>Chat</h2><button class="bad" data-clear>Clear all messages</button>`;
  for(const[f,n,v]of keep){const el=box.querySelector(`#${f} [name=${n}]`);if(el)el.value=v}
  afxSummary();
@@ -366,6 +367,7 @@ $("#p-admin").onsubmit=async e=>{
  e.preventDefault();if(!isAdmin())return;const f=new FormData(e.target),id=e.target.id;
  try{
   if(id==="af"){await api("item/add",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),stock:f.get("stock"),kind:f.get("kind"),img:imgs.item});setImg("item","");toast("Item added")}
+  else if(id==="wf"){await api("word/ban",{w:f.get("w")});toast("Word banned")}
   else if(id==="cf"){await api("cat/add",{name:f.get("name"),hp:f.get("hp"),price:f.get("price"),img:imgs.cat});setImg("cat","");toast("Cat created")}
   else if(id==="mf"){await api("move/add",{name:f.get("name"),damage:f.get("damage"),price:f.get("price"),anim:f.get("anim"),fx:afx&&afx.t==="gif"?{t:"gif",g:afx.url}:afx&&afx.t==="frames"?{t:"frames",f:afx.urls,ms:afx.ms}:null});afx=null;afr=[];agif="";afxSummary();toast("Ability created")}
   e.target.reset();
@@ -383,6 +385,7 @@ $("#p-admin").onclick=async e=>{
   else if(d.adm)await api("admin/promote",{to:d.adm});
   else if(d.give&&meId===ROOT){const n=parseInt(document.querySelector(`[data-amt="${d.give}"]`).value);if(!n)return toast("Enter an amount");await api("admin/give",{to:d.give,n})}
   else if(d.ban&&meId===ROOT){if(confirm("Ban this player and delete their account and chat history?"))await api("admin/ban",{to:d.ban})}
+  else if(d.unw)await api("word/unban",{w:d.unw});
   else if(d.unban&&meId===ROOT)await api("admin/unban",{to:d.unban});
   else if("inf" in d&&meId===ROOT){const on=!me().inf;await api("infinite",{on});toast(on?"Infinite coins ON":"Infinite coins OFF")}
   else if("clear" in d){const b=e.target;if(!b.dataset.sure){b.dataset.sure="1";b.textContent="Click again to delete everything";setTimeout(()=>{b.dataset.sure="";b.textContent="Clear all messages"},3000)}else await api("admin/clear")}
