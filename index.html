@@ -301,7 +301,8 @@ function renderWallet(){
  box.innerHTML=`<div class="set" style="text-align:center"><small style="color:var(--mute)">Your balance</small><div class="big-bal">🪙 ${m.inf?"∞":m.coins}</div><button data-daily ${left>0?"disabled":""}>${left>0?`Daily bonus in ${Math.ceil(left/36e5)}h`:"Claim 50 daily coins"}</button></div>
  <h2>Send coins</h2><form id="payf" class="set"><div class="row"><input name="to" list="plist" placeholder="Player name" required maxlength="16" autocomplete="off"><input name="amt" type="number" min="1" placeholder="Amount" required></div><datalist id="plist">${names.map(p=>`<option value="${esc(p.name)}">`).join("")}</datalist><button>Send</button></form>
  <h2>Your items</h2>${inv.length?inv.map(([id,n])=>{const i=items[id];return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}${rb2(i.rarity)}</div><b>×${n}</b>${i.kind==="fun"?`<button class="ghost" data-discard="${id}">Get rid of</button>`:(i.kind||"normal")==="normal"&&i.price>0?`<button class="ghost" data-sell="${id}">Sell 🪙${Math.floor(i.price*.7)}</button>`:""}</div>`}).join(""):'<div class="empty">Nothing yet. Visit the shop.</div>'}
- <h2>Your abilities</h2>${mv.length?(oc.length?mv.map(id=>{const k=moves[id];return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}<small>${k.damage} damage · equip on:</small></div><div class="row" style="flex-basis:100%">${oc.map(c=>{const on=(eqc[c]||[]).includes(id);return `<button class="${on?"":"ghost"}" data-eqm="${id}" data-eqc="${c}">${on?"✓ ":""}${esc(cats[c].name)}</button>`}).join("")}</div></div>`}).join(""):'<div class="empty">Get a cat first, then you can equip abilities on it.</div>'):'<div class="empty">No abilities yet. Buy some in the Battle tab. Scratch is always available.</div>'}
+ <h2>Your cats</h2>${oc.length?oc.map(id=>{const c=cats[id];return `<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b>${rb2(c.rarity)}<small>${c.hp} HP</small></div><button class="ghost" data-sellc="${id}">Sell 🪙${Math.floor(c.price*.7)}</button></div>`}).join(""):'<div class="empty">No cats yet. Get one in the Shop tab.</div>'}
+ <h2>Your abilities</h2>${mv.length?(oc.length?mv.map(id=>{const k=moves[id];return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}<small>${k.damage} damage · equip on:</small></div><button class="ghost" data-sellm="${id}">Sell 🪙${Math.floor(k.price*.7)}</button><div class="row" style="flex-basis:100%">${oc.map(c=>{const on=(eqc[c]||[]).includes(id);return `<button class="${on?"":"ghost"}" data-eqm="${id}" data-eqc="${c}">${on?"✓ ":""}${esc(cats[c].name)}</button>`}).join("")}</div></div>`}).join(""):'<div class="empty">Get a cat first, then you can equip abilities on it.</div>'):'<div class="empty">No abilities yet. Buy some in the Battle tab. Scratch is always available.</div>'}
  <h2>Richest cats</h2>${top.map((p,i)=>`<div class="card">${avHTML(p)}<div class="i"><b>${i+1}. ${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}</div><span class="price">🪙 ${p.inf?"∞":p.coins}</span></div>`).join("")}`;
 }
 $("#p-wallet").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await pay(String(f.get("to")).trim(),parseInt(f.get("amt")));e.target.reset()}catch(x){}};
@@ -349,7 +350,9 @@ $("#p-wallet").onclick=async e=>{
  try{if("daily" in d){await api("daily");toast("+50 coins")}
  else if(d.sell){await api("sell",{id:d.sell});toast("Sold")}
  else if(d.discard)await api("discard",{id:d.discard});
- else if(d.eqm){const on=!((me().eqc||{})[d.eqc]||[]).includes(+d.eqm);await api("move/equip",{id:d.eqm,cat:d.eqc,on})}}catch(x){}
+ else if(d.eqm){const on=!((me().eqc||{})[d.eqc]||[]).includes(+d.eqm);await api("move/equip",{id:d.eqm,cat:d.eqc,on})}
+ else if(d.sellc){const c=cats[d.sellc];if(c&&confirm(`Sell ${c.name} for ${Math.floor(c.price*.7)} coins?`)){await api("cat/sell",{id:d.sellc});toast("Cat sold")}}
+ else if(d.sellm){const k=moves[d.sellm];if(k&&confirm(`Sell ${k.name} for ${Math.floor(k.price*.7)} coins?`)){await api("move/sell",{id:d.sellm});toast("Ability sold")}}}catch(x){}
 };
 
 const animSel=`<select name="anim">${["slash","claw","fire","water","bolt","star"].map(a=>`<option>${a}</option>`).join("")}</select>`;
@@ -571,9 +574,6 @@ $("#p-battle").onclick=async e=>{
   else if(d.bm){await api("move/buy",{id:d.bm});toast("Ability learned")}
  }catch(x){}
 };
-</script>
-</body>
-</html>
 </script>
 </body>
 </html>
