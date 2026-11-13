@@ -27,15 +27,19 @@ try{db.exec("ALTER TABLE cats ADD COLUMN listed INTEGER DEFAULT 1")}catch(e){}
 try{db.exec("ALTER TABLE cats ADD COLUMN stock INTEGER DEFAULT -1")}catch(e){}
 try{db.exec("ALTER TABLE moves ADD COLUMN listed INTEGER DEFAULT 1")}catch(e){}
 try{db.exec("ALTER TABLE items ADD COLUMN listed INTEGER DEFAULT 1")}catch(e){}
+for(const t of["items","cats","moves"]){try{db.exec(`ALTER TABLE ${t} ADD COLUMN rarity TEXT DEFAULT 'common'`)}catch(e){}try{db.exec(`ALTER TABLE ${t} ADD COLUMN packonly INTEGER DEFAULT 0`)}catch(e){}}
+try{db.exec("ALTER TABLE moves ADD COLUMN stock INTEGER DEFAULT -1")}catch(e){}
 db.exec("CREATE TABLE IF NOT EXISTS badwords(w TEXT PRIMARY KEY)");
 db.exec("CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY AUTOINCREMENT,pid TEXT,text TEXT,ts INTEGER)");
+db.exec("CREATE TABLE IF NOT EXISTS packs(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,emoji TEXT DEFAULT '🎁',price INTEGER DEFAULT 0,stock INTEGER DEFAULT -1,chances TEXT DEFAULT '{}',contents TEXT DEFAULT '[]',listed INTEGER DEFAULT 1)");
+try{db.exec("ALTER TABLE packs ADD COLUMN filler TEXT DEFAULT ''")}catch(e){}
 const MAX_SELL=5,MAX_DMG=1e6,MAX_HP=MAX_DMG*10;
 const q=s=>db.prepare(s);
 
 // ---- persistence: the host's disk is wiped when the server sleeps, so the whole
 // database is copied to Supabase (one row) after changes and loaded back on startup.
 const SB_URL=(process.env.SUPABASE_URL||"").replace(/\/+$/,""),SB_KEY=process.env.SUPABASE_SERVICE_KEY||"",SB_ON=!!(SB_URL&&SB_KEY);
-const TABLES=["players","items","messages","sessions","blocked","cats","moves","notes","badwords"];
+const TABLES=["players","items","messages","sessions","blocked","cats","moves","notes","badwords","packs"];
 const sb=(method,p,body)=>fetch(SB_URL+"/rest/v1/"+p,{method,headers:{apikey:SB_KEY,...(SB_KEY.startsWith("eyJ")?{Authorization:"Bearer "+SB_KEY}:{}),"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:body&&JSON.stringify(body)});
 const dump=()=>{const o={};for(const t of TABLES)o[t]=db.prepare("SELECT * FROM "+t).all();return o};
 async function restore(){
@@ -137,6 +141,19 @@ const post=(name,text,sys=1)=>{if(sys)return;q("INSERT INTO messages(name,text,t
 const adm=p=>{if(!p.admin)bad("Admins only")},root=p=>{if(p.id!==ROOT)bad("Only "+ROOT+" can do that")};
 const inf=p=>p.id===ROOT&&!!p.infinite;
 const ANIMS=["slash","fire","water","bolt","star","claw"],SCRATCH={id:0,name:"Scratch",damage:10,anim:"slash"};
+const rarOk=v=>{const s=String(v==null?"":v).toLowerCase().replace(/[^\p{L}\p{N} '\-]/gu,"").trim().slice(0,20).trim();return s==="none"?"":s},rk=v=>rarOk(v)||"~",TB={item:"items",cat:"cats",move:"moves"};
+// chances are percents keyed by rarity name ("~" = no rarity); old packs used the key "none"
+const chOf=k=>{const c=JSON.parse(k.chances||"{}");if(c.none!=null){c["~"]=(c["~"]||0)+ +c.none;delete c.none}return c};
+// packs: roll a rarity by the pack's chances (only rarities that have prizes), then pick one prize of that rarity at random
+const rollPack=k=>{const by={},all=[],ch=chOf(k),fl=JSON.parse(k.filler||"null");let fill=null;
+ for(const c of JSON.parse(k.contents||"[]")){const row=Object.hasOwn(TB,c.t)&&q(`SELECT * FROM ${TB[c.t]} WHERE id=?`).get(c.id);if(!row)continue;const e={t:c.t,row};all.push(e);
+  if(fl&&fl.t===c.t&&fl.id===c.id){fill=e;continue}(by[rk(row.rarity)]=by[rk(row.rarity)]||[]).push(e)}
+ if(!all.length)return null;
+ const tiers=Object.keys(by).filter(r=>+ch[r]>0),S=tiers.reduce((s,r)=>s+ +ch[r],0);
+ if(!tiers.length)return fill||all[crypto.randomInt(all.length)];
+ let x=crypto.randomInt(1e9)/1e9*(fill?Math.max(100,S):S);
+ for(const r of tiers){if(x<+ch[r])return by[r][crypto.randomInt(by[r].length)];x-=+ch[r]}
+ return fill||by[tiers[tiers.length-1]][0]};
 const imgOk=v=>typeof v==="string"&&v.length<80000&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(v)?v:"";
 // custom attack animations: a GIF, or up to 12 small PNG frames
 const normFx=v=>{if(v&&v.t==="gif"&&typeof v.g==="string"&&v.g.length<125000&&/^data:image\/gif;base64,[A-Za-z0-9+\/=]+$/.test(v.g))return JSON.stringify({t:"gif",g:v.g});
@@ -179,7 +196,7 @@ const actions={
   q("UPDATE players SET coins=coins+? WHERE id=?").run(n,t.id);post(p.name,`${p.name} sent ${n} coins to ${t.name}`)},
  daily(p){if(Date.now()-p.daily<864e5)bad("Daily bonus isn’t ready yet");q("UPDATE players SET coins=coins+50,daily=? WHERE id=?").run(Date.now(),p.id)},
  buy(p,b){const i=q("SELECT * FROM items WHERE id=?").get(parseInt(b.id));
-  if(!i||i.listed===0)bad("That item is gone");if(i.stock===0)bad("Sold out");if(i.seller&&i.seller===p.id)bad("You can’t buy your own item");if(!inf(p)&&p.coins<i.price)bad("Not enough coins");
+  if(!i||i.listed===0||i.packonly)bad("That item is gone");if(i.stock===0)bad("Sold out");if(i.seller&&i.seller===p.id)bad("You can’t buy your own item");if(!inf(p)&&p.coins<i.price)bad("Not enough coins");
   const inv=JSON.parse(p.inv);inv[i.id]=(inv[i.id]||0)+1;
   q("UPDATE players SET coins=coins-?,inv=? WHERE id=?").run(inf(p)?0:i.price,JSON.stringify(inv),p.id);
   const sl=i.seller?find(i.seller):null;if(sl)q("UPDATE players SET coins=coins+? WHERE id=?").run(Math.floor(i.price*(i.stock<0?0.05:0.5)),sl.id);
@@ -220,26 +237,50 @@ const actions={
  infinite(p,b){root(p);q("UPDATE players SET infinite=? WHERE id=?").run(b.on?1:0,p.id)},
  "item/add"(p,b){adm(p);const pr=parseInt(b.price);if(!(pr>=0&&pr<=1e6))bad("Enter a price (0 for a free item)");const name=String(b.name||"").trim().slice(0,40);if(!name)bad("Give the item a name");
   const st=parseInt(b.stock);
-  q("INSERT INTO items(name,emoji,descr,price,stock,kind,img) VALUES(?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),pr,st>0?st:-1,["physical","fun"].includes(b.kind)?b.kind:"normal",imgOk(b.img))},
+  q("INSERT INTO items(name,emoji,descr,price,stock,kind,img,rarity,packonly) VALUES(?,?,?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),pr,st>0?st:-1,["physical","fun"].includes(b.kind)?b.kind:"normal",imgOk(b.img),rarOk(b.rarity),b.po?1:0)},
  "cat/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the cat a name");
-  const st=parseInt(b.stock);q("INSERT INTO cats(name,img,hp,price,stock) VALUES(?,?,?,?,?)").run(n,imgOk(b.img),Math.min(MAX_HP,Math.max(1,parseInt(b.hp)||50)),Math.max(0,parseInt(b.price)||0),st>0?st:-1)},
- "cat/buy"(p,b){const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.id));if(!c||c.listed===0)bad("That cat isn’t for sale");if(c.stock===0)bad("Sold out");
+  const st=parseInt(b.stock);q("INSERT INTO cats(name,img,hp,price,stock,rarity,packonly) VALUES(?,?,?,?,?,?,?)").run(n,imgOk(b.img),Math.min(MAX_HP,Math.max(1,parseInt(b.hp)||50)),Math.max(0,parseInt(b.price)||0),st>0?st:-1,rarOk(b.rarity),b.po?1:0)},
+ "cat/buy"(p,b){const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.id));if(!c||c.listed===0||c.packonly)bad("That cat isn’t for sale");if(c.stock===0)bad("Sold out");
   const own=JSON.parse(p.cats||"[]");if(own.includes(c.id))bad("You already have that cat");
   if(!inf(p)&&p.coins<c.price)bad("Not enough coins");own.push(c.id);
   q("UPDATE players SET coins=coins-?,cats=? WHERE id=?").run(inf(p)?0:c.price,JSON.stringify(own),p.id);if(c.stock>0)q("UPDATE cats SET stock=stock-1 WHERE id=?").run(c.id)},
  "cat/remove"(p,b){adm(p);q("UPDATE cats SET listed=0 WHERE id=?").run(parseInt(b.id))},
+ "pack/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the pack a name");
+  const price=Math.max(0,Math.min(1e6,parseInt(b.price)||0)),st=parseInt(b.stock),ch={},seen=new Set(),con=[],tiers=new Set();
+  const pick=c=>{const t=c&&c.t,id=parseInt(c&&c.id);if(!Object.hasOwn(TB,t)||!(id>0))return null;const row=q(`SELECT * FROM ${TB[t]} WHERE id=?`).get(id);return row&&row.listed!==0&&!(t==="item"&&row.seller)?{t,id,row}:null};
+  const fl=b.filler?pick(b.filler):null;if(b.filler&&!fl)bad("That leftover prize isn’t available");
+  for(const c of(Array.isArray(b.contents)?b.contents.slice(0,60):[])){const x=pick(c);if(!x)continue;const k=x.t+":"+x.id;if(seen.has(k))continue;seen.add(k);con.push({t:x.t,id:x.id});if(!(fl&&fl.t===x.t&&fl.id===x.id))tiers.add(rk(x.row.rarity))}
+  if(fl&&!seen.has(fl.t+":"+fl.id))con.push({t:fl.t,id:fl.id});
+  if(!con.length)bad("Pick at least one prize for the pack");
+  let sum=0;for(const[key,v]of Object.entries(b.chances&&typeof b.chances==="object"?b.chances:{})){const pc=Math.max(0,Math.min(100,parseFloat(v)||0));if(!(pc>0))continue;const r=key==="~"?"~":rk(key);
+   if(!tiers.has(r))bad(`Nothing in the pack has the rarity “${r==="~"?"no rarity":r}”`);ch[r]=(ch[r]||0)+pc;sum+=pc}
+  if(sum>100.0001)bad("The chances add up to more than 100%");
+  q("INSERT INTO packs(name,emoji,price,stock,chances,contents,filler) VALUES(?,?,?,?,?,?,?)").run(n,String(b.emoji||"").trim().slice(0,4)||"🎁",price,st>0?st:-1,JSON.stringify(ch),JSON.stringify(con),fl?JSON.stringify({t:fl.t,id:fl.id}):"")},
+ "pack/remove"(p,b){adm(p);q("UPDATE packs SET listed=0 WHERE id=?").run(parseInt(b.id))},
+ "pack/buy"(p,b){const k=q("SELECT * FROM packs WHERE id=?").get(parseInt(b.id));if(!k||k.listed===0)bad("That pack is gone");if(k.stock===0)bad("Sold out");
+  if(!inf(p)&&p.coins<k.price)bad("Not enough coins");
+  const w=rollPack(k);if(!w)bad("This pack is empty right now");
+  const row=w.row;let dup=false;
+  if(w.t==="item"){const inv=JSON.parse(p.inv);inv[row.id]=(inv[row.id]||0)+1;q("UPDATE players SET inv=? WHERE id=?").run(JSON.stringify(inv),p.id);
+   if(row.kind==="physical"){const r=find(ROOT);if(r)q("INSERT INTO notes(pid,text,ts) VALUES(?,?,?)").run(r.id,`${p.name} won your real item ${row.emoji} ${row.name} from a pack. Hand it over to them!`,Date.now())}}
+  else if(w.t==="cat"){const own=JSON.parse(p.cats||"[]");if(own.includes(row.id))dup=true;else{own.push(row.id);q("UPDATE players SET cats=? WHERE id=?").run(JSON.stringify(own),p.id)}}
+  else{const own=JSON.parse(p.moves||"[]");if(own.includes(row.id))dup=true;else{own.push(row.id);q("UPDATE players SET moves=?,eq=? WHERE id=?").run(JSON.stringify(own),p.eq==null?null:JSON.stringify([...JSON.parse(p.eq),row.id]),p.id)}}
+  const refund=dup?Math.floor(k.price/2):0;
+  if(!inf(p))q("UPDATE players SET coins=coins-?+? WHERE id=?").run(k.price,refund,p.id);
+  if(k.stock>0)q("UPDATE packs SET stock=stock-1 WHERE id=?").run(k.id);
+  return{res:{name:row.name,emoji:w.t==="item"?(row.emoji||"🎁"):w.t==="cat"?"🐱":"⚔️",rarity:rarOk(row.rarity),dup,refund}}},
  "move/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the ability a name");
   const fx=b.fx?normFx(b.fx):"";if(b.fx&&!fx)bad("That animation is too big or invalid");
-  q("INSERT INTO moves(name,damage,anim,price,fx) VALUES(?,?,?,?,?)").run(n,Math.min(MAX_DMG,Math.max(1,parseInt(b.damage)||10)),ANIMS.includes(b.anim)?b.anim:"slash",Math.max(0,parseInt(b.price)||0),fx)},
+  q("INSERT INTO moves(name,damage,anim,price,fx,stock,rarity,packonly) VALUES(?,?,?,?,?,?,?,?)").run(n,Math.min(MAX_DMG,Math.max(1,parseInt(b.damage)||10)),ANIMS.includes(b.anim)?b.anim:"slash",Math.max(0,parseInt(b.price)||0),fx,parseInt(b.stock)>0?parseInt(b.stock):-1,rarOk(b.rarity),b.po?1:0)},
  "move/equip"(p,b){const id=parseInt(b.id),cid=parseInt(b.cat);if(!owned(p).includes(id))bad("You don’t know that ability");
   if(!JSON.parse(p.cats||"[]").includes(cid))bad("You don’t own that cat");
   let e=equippedFor(p,cid);e=b.on?[...new Set([...e,id])]:e.filter(v=>v!==id);
   const m=ceqOf(p);m[cid]=e;q("UPDATE players SET ceq=? WHERE id=?").run(JSON.stringify(m),p.id)},
  "move/remove"(p,b){adm(p);q("UPDATE moves SET listed=0 WHERE id=?").run(parseInt(b.id))},
- "move/buy"(p,b){const m=q("SELECT * FROM moves WHERE id=?").get(parseInt(b.id));if(!m||m.listed===0)bad("That ability isn’t for sale");
+ "move/buy"(p,b){const m=q("SELECT * FROM moves WHERE id=?").get(parseInt(b.id));if(!m||m.listed===0||m.packonly)bad("That ability isn’t for sale");if(m.stock===0)bad("Sold out");
   const own=JSON.parse(p.moves||"[]");if(own.includes(m.id))bad("You already know that ability");
   if(!inf(p)&&p.coins<m.price)bad("Not enough coins");own.push(m.id);
-  q("UPDATE players SET coins=coins-?,moves=?,eq=? WHERE id=?").run(inf(p)?0:m.price,JSON.stringify(own),p.eq==null?null:JSON.stringify([...JSON.parse(p.eq),m.id]),p.id);post(p.name,`${p.name} learned ${m.name}`)},
+  q("UPDATE players SET coins=coins-?,moves=?,eq=? WHERE id=?").run(inf(p)?0:m.price,JSON.stringify(own),p.eq==null?null:JSON.stringify([...JSON.parse(p.eq),m.id]),p.id);if(m.stock>0)q("UPDATE moves SET stock=stock-1 WHERE id=?").run(m.id);post(p.name,`${p.name} learned ${m.name}`)},
  "battle/challenge"(p,b){const t=find(b.to),c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.cat));
   if(!t||t.banned||t.id===p.id)bad("Pick another player");if(!c)bad("Pick your cat");
   if(!JSON.parse(p.cats||"[]").includes(c.id))bad("You don’t own that cat");
@@ -317,9 +358,10 @@ const pub=p=>{const a=JSON.parse(p.avatar||"{}");
  return{id:p.id,name:p.name,coins:p.coins,inv:JSON.parse(p.inv||"{}"),cats:JSON.parse(p.cats||"[]"),admin:!!p.admin,banned:!!p.banned,inf:p.id===ROOT&&!!p.infinite,avatar:Object.keys(a).length?{...a,photo:p.photo?`/avatar/${p.id}?v=${p.pv}`:""}:undefined}};
 const snapshot=()=>{const on=new Set([...clients].map(c=>c.pid));return JSON.stringify({
  players:q("SELECT * FROM players").all().map(p=>({...pub(p),online:on.has(p.id)})),
- items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal",seller:i.seller||"",listed:i.listed!==0,img:i.img?`/img/item/${i.id}`:""})),
- cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,price:c.price||0,stock:c.stock==null?-1:c.stock,listed:c.listed!==0,img:c.img?`/img/cat/${c.id}`:""})),
- moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,listed:k.listed!==0,fx:fxInfo(k)})),
+ items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal",seller:i.seller||"",listed:i.listed!==0,rarity:rarOk(i.rarity),po:!!i.packonly,img:i.img?`/img/item/${i.id}`:""})),
+ cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,price:c.price||0,stock:c.stock==null?-1:c.stock,rarity:rarOk(c.rarity),po:!!c.packonly,listed:c.listed!==0,img:c.img?`/img/cat/${c.id}`:""})),
+ moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,stock:k.stock==null?-1:k.stock,rarity:rarOk(k.rarity),po:!!k.packonly,listed:k.listed!==0,fx:fxInfo(k)})),
+ packs:q("SELECT * FROM packs WHERE listed!=0").all().map(k=>({id:k.id,name:k.name,emoji:k.emoji,price:k.price,stock:k.stock,chances:chOf(k),contents:JSON.parse(k.contents||"[]").map(c=>{const r=Object.hasOwn(TB,c.t)&&q(`SELECT * FROM ${TB[c.t]} WHERE id=?`).get(c.id);return r?{t:c.t,id:c.id,name:r.name,rarity:rarOk(r.rarity),fill:(f=>!!f&&f.t===c.t&&f.id===c.id)(JSON.parse(k.filler||"null"))}:null}).filter(Boolean)})),
  messages:q("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all()})};
 function sendTo(c,base){const m=find(c.pid);if(!m)return;
  c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),daily:m.daily,moves:JSON.parse(m.moves||"[]"),eqc:Object.fromEntries(JSON.parse(m.cats||"[]").map(id=>[id,equippedFor(m,id)])),battle:inBattle(m.id)||null,trades:[...trades.values()].filter(x=>x.from===m.id||x.to===m.id).map(({id,from,to,give,want})=>({id,from,to,give,want})),blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined,notes:q("SELECT id,text FROM notes WHERE pid=? ORDER BY id").all(m.id),words:m.admin?q("SELECT w FROM badwords ORDER BY w").all().map(r=>r.w):undefined})+"}\n\n")}
@@ -367,7 +409,7 @@ http.createServer(async(req,res)=>{
    if(!Object.hasOwn(actions,act))return J(res,404,{error:"Unknown action"});
    const r=tx(()=>actions[act](p,b));push();
    if(r&&r.kick)for(const c of clients)if(c.pid===r.kick){c.res.write("event: bye\ndata: "+(r.reason||"")+"\n\n");c.res.end();clients.delete(c)}
-   return J(res,200,{ok:1});
+   return J(res,200,{ok:1,res:r&&r.res});
   }
   res.writeHead(404).end("Not found");
  }catch(e){
