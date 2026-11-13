@@ -24,6 +24,9 @@ try{db.exec("ALTER TABLE moves ADD COLUMN fx TEXT DEFAULT ''")}catch(e){}
 try{db.exec("ALTER TABLE players ADD COLUMN eq TEXT DEFAULT NULL")}catch(e){}
 try{db.exec("ALTER TABLE players ADD COLUMN ceq TEXT DEFAULT '{}'")}catch(e){}
 try{db.exec("ALTER TABLE cats ADD COLUMN listed INTEGER DEFAULT 1")}catch(e){}
+try{db.exec("ALTER TABLE cats ADD COLUMN stock INTEGER DEFAULT -1")}catch(e){}
+try{db.exec("ALTER TABLE moves ADD COLUMN listed INTEGER DEFAULT 1")}catch(e){}
+try{db.exec("ALTER TABLE items ADD COLUMN listed INTEGER DEFAULT 1")}catch(e){}
 db.exec("CREATE TABLE IF NOT EXISTS badwords(w TEXT PRIMARY KEY)");
 db.exec("CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY AUTOINCREMENT,pid TEXT,text TEXT,ts INTEGER)");
 const MAX_SELL=5,MAX_DMG=1e6,MAX_HP=MAX_DMG*10;
@@ -66,12 +69,19 @@ process.on("SIGTERM",bye);process.on("SIGINT",bye);
 
 (async()=>{
 await restore();
-// keep cat ids from being reused: bump the id counter past every id anyone owns, and drop owned ids that no longer exist
-{const ids=new Set(q("SELECT id FROM cats").all().map(r=>r.id));let mx=Math.max(0,...ids);
- for(const pl of q("SELECT id,cats FROM players").all()){const own=JSON.parse(pl.cats||"[]");own.forEach(i=>mx=Math.max(mx,i));
-  const keep=own.filter(i=>ids.has(i));if(keep.length!==own.length)q("UPDATE players SET cats=? WHERE id=?").run(JSON.stringify(keep),pl.id)}
- const r=q("SELECT seq FROM sqlite_sequence WHERE name='cats'").get();
- if(r){if(r.seq<mx)q("UPDATE sqlite_sequence SET seq=? WHERE name='cats'").run(mx)}else q("INSERT INTO sqlite_sequence(name,seq) VALUES('cats',?)").run(mx)}
+// keep cat/ability ids from being reused: bump each id counter past every id anyone owns, and drop owned ids that no longer exist
+{for(const t of["cats","moves"]){const ids=new Set(q(`SELECT id FROM ${t}`).all().map(r=>r.id));let mx=Math.max(0,...ids);
+ for(const pl of q(`SELECT id,${t} c FROM players`).all()){const own=JSON.parse(pl.c||"[]");own.forEach(i=>mx=Math.max(mx,i));
+  const keep=own.filter(i=>ids.has(i));if(keep.length!==own.length)q(`UPDATE players SET ${t}=? WHERE id=?`).run(JSON.stringify(keep),pl.id)}
+ const r=q("SELECT seq FROM sqlite_sequence WHERE name=?").get(t);
+ if(r){if(r.seq<mx)q("UPDATE sqlite_sequence SET seq=? WHERE name=?").run(mx,t)}else q("INSERT INTO sqlite_sequence(name,seq) VALUES(?,?)").run(t,mx)}}
+// items: same protection (inv is an object keyed by item id)
+{const ids=new Set(q("SELECT id FROM items").all().map(r=>r.id));let mx=Math.max(0,...ids);
+ for(const pl of q("SELECT id,inv FROM players").all()){const inv=JSON.parse(pl.inv||"{}");let ch=0;
+  for(const k of Object.keys(inv)){mx=Math.max(mx,+k);if(!ids.has(+k)){delete inv[k];ch=1}}
+  if(ch)q("UPDATE players SET inv=? WHERE id=?").run(JSON.stringify(inv),pl.id)}
+ const r=q("SELECT seq FROM sqlite_sequence WHERE name='items'").get();
+ if(r){if(r.seq<mx)q("UPDATE sqlite_sequence SET seq=? WHERE name='items'").run(mx)}else q("INSERT INTO sqlite_sequence(name,seq) VALUES('items',?)").run(mx)}
 q("DELETE FROM messages WHERE sys=1").run();
 const hashPw=(pw,salt)=>crypto.scryptSync(pw,salt,32).toString("hex");
 const same=(a,b)=>{const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&crypto.timingSafeEqual(x,y)};
@@ -169,7 +179,7 @@ const actions={
   q("UPDATE players SET coins=coins+? WHERE id=?").run(n,t.id);post(p.name,`${p.name} sent ${n} coins to ${t.name}`)},
  daily(p){if(Date.now()-p.daily<864e5)bad("Daily bonus isn’t ready yet");q("UPDATE players SET coins=coins+50,daily=? WHERE id=?").run(Date.now(),p.id)},
  buy(p,b){const i=q("SELECT * FROM items WHERE id=?").get(parseInt(b.id));
-  if(!i)bad("That item is gone");if(i.stock===0)bad("Sold out");if(i.seller&&i.seller===p.id)bad("You can’t buy your own item");if(!inf(p)&&p.coins<i.price)bad("Not enough coins");
+  if(!i||i.listed===0)bad("That item is gone");if(i.stock===0)bad("Sold out");if(i.seller&&i.seller===p.id)bad("You can’t buy your own item");if(!inf(p)&&p.coins<i.price)bad("Not enough coins");
   const inv=JSON.parse(p.inv);inv[i.id]=(inv[i.id]||0)+1;
   q("UPDATE players SET coins=coins-?,inv=? WHERE id=?").run(inf(p)?0:i.price,JSON.stringify(inv),p.id);
   const sl=i.seller?find(i.seller):null;if(sl)q("UPDATE players SET coins=coins+? WHERE id=?").run(Math.floor(i.price*(i.stock<0?0.05:0.5)),sl.id);
@@ -178,12 +188,12 @@ const actions={
   post(p.name,`${p.name} bought ${i.emoji} ${i.name}${i.kind==="physical"?" (a real one!)":""}${sl?` from ${sl.name}`:""}`)},
  "item/sell"(p,b){const name=String(b.name||"").trim().slice(0,40);if(!name)bad("Give your item a name");
   const price=parseInt(b.price);if(!(price>=1&&price<=1e6))bad("Price must be between 1 and 1,000,000");
-  if(!p.admin&&q("SELECT COUNT(*) c FROM items WHERE seller=? AND stock!=0").get(p.id).c>=MAX_SELL)bad(`You can only have ${MAX_SELL} items for sale at once`);
+  if(!p.admin&&q("SELECT COUNT(*) c FROM items WHERE seller=? AND stock!=0 AND listed!=0").get(p.id).c>=MAX_SELL)bad(`You can only have ${MAX_SELL} items for sale at once`);
   const qty=b.qty===""||b.qty===null?-1:Math.min(99,Math.max(1,parseInt(b.qty)||1)),fee=p.admin?0:Math.ceil(price*(qty<0?1:qty)*0.2);
   if(fee){if(p.coins<fee)bad(`Listing this costs ${fee} coins (20% of the price)`);q("UPDATE players SET coins=coins-? WHERE id=?").run(fee,p.id)}
   q("INSERT INTO items(name,emoji,descr,price,stock,kind,seller,img) VALUES(?,?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),price,qty,["physical","fun"].includes(b.kind)?b.kind:"normal",p.id,imgOk(b.img))},
  "item/cancel"(p,b){const i=q("SELECT * FROM items WHERE id=?").get(parseInt(b.id));
-  if(!i||i.seller!==p.id||i.stock===0)bad("You can’t cancel that");
+  if(!i||i.seller!==p.id||i.stock===0||i.listed===0)bad("You can’t cancel that");
   const sold=q("SELECT inv FROM players").all().some(r=>JSON.parse(r.inv||"{}")[i.id]>0);
   if(sold)q("UPDATE items SET stock=0 WHERE id=?").run(i.id);else q("DELETE FROM items WHERE id=?").run(i.id)},
  avatar(p,b){
@@ -212,13 +222,12 @@ const actions={
   const st=parseInt(b.stock);
   q("INSERT INTO items(name,emoji,descr,price,stock,kind,img) VALUES(?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),pr,st>0?st:-1,["physical","fun"].includes(b.kind)?b.kind:"normal",imgOk(b.img))},
  "cat/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the cat a name");
-  q("INSERT INTO cats(name,img,hp,price) VALUES(?,?,?,?)").run(n,imgOk(b.img),Math.min(MAX_HP,Math.max(1,parseInt(b.hp)||50)),Math.max(0,parseInt(b.price)||0))},
- "cat/buy"(p,b){const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.id));if(!c||c.listed===0)bad("That cat isn’t for sale");
+  const st=parseInt(b.stock);q("INSERT INTO cats(name,img,hp,price,stock) VALUES(?,?,?,?,?)").run(n,imgOk(b.img),Math.min(MAX_HP,Math.max(1,parseInt(b.hp)||50)),Math.max(0,parseInt(b.price)||0),st>0?st:-1)},
+ "cat/buy"(p,b){const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.id));if(!c||c.listed===0)bad("That cat isn’t for sale");if(c.stock===0)bad("Sold out");
   const own=JSON.parse(p.cats||"[]");if(own.includes(c.id))bad("You already have that cat");
   if(!inf(p)&&p.coins<c.price)bad("Not enough coins");own.push(c.id);
-  q("UPDATE players SET coins=coins-?,cats=? WHERE id=?").run(inf(p)?0:c.price,JSON.stringify(own),p.id)},
+  q("UPDATE players SET coins=coins-?,cats=? WHERE id=?").run(inf(p)?0:c.price,JSON.stringify(own),p.id);if(c.stock>0)q("UPDATE cats SET stock=stock-1 WHERE id=?").run(c.id)},
  "cat/remove"(p,b){adm(p);q("UPDATE cats SET listed=0 WHERE id=?").run(parseInt(b.id))},
- "cat/relist"(p,b){adm(p);q("UPDATE cats SET listed=1 WHERE id=?").run(parseInt(b.id))},
  "move/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the ability a name");
   const fx=b.fx?normFx(b.fx):"";if(b.fx&&!fx)bad("That animation is too big or invalid");
   q("INSERT INTO moves(name,damage,anim,price,fx) VALUES(?,?,?,?,?)").run(n,Math.min(MAX_DMG,Math.max(1,parseInt(b.damage)||10)),ANIMS.includes(b.anim)?b.anim:"slash",Math.max(0,parseInt(b.price)||0),fx)},
@@ -226,8 +235,8 @@ const actions={
   if(!JSON.parse(p.cats||"[]").includes(cid))bad("You don’t own that cat");
   let e=equippedFor(p,cid);e=b.on?[...new Set([...e,id])]:e.filter(v=>v!==id);
   const m=ceqOf(p);m[cid]=e;q("UPDATE players SET ceq=? WHERE id=?").run(JSON.stringify(m),p.id)},
- "move/remove"(p,b){adm(p);q("DELETE FROM moves WHERE id=?").run(parseInt(b.id))},
- "move/buy"(p,b){const m=q("SELECT * FROM moves WHERE id=?").get(parseInt(b.id));if(!m)bad("That ability is gone");
+ "move/remove"(p,b){adm(p);q("UPDATE moves SET listed=0 WHERE id=?").run(parseInt(b.id))},
+ "move/buy"(p,b){const m=q("SELECT * FROM moves WHERE id=?").get(parseInt(b.id));if(!m||m.listed===0)bad("That ability isn’t for sale");
   const own=JSON.parse(p.moves||"[]");if(own.includes(m.id))bad("You already know that ability");
   if(!inf(p)&&p.coins<m.price)bad("Not enough coins");own.push(m.id);
   q("UPDATE players SET coins=coins-?,moves=?,eq=? WHERE id=?").run(inf(p)?0:m.price,JSON.stringify(own),p.eq==null?null:JSON.stringify([...JSON.parse(p.eq),m.id]),p.id);post(p.name,`${p.name} learned ${m.name}`)},
@@ -283,7 +292,7 @@ const actions={
   q("UPDATE players SET inv=?,cats=? WHERE id=?").run(JSON.stringify(ia),JSON.stringify(na),a.id);
   q("UPDATE players SET inv=?,cats=? WHERE id=?").run(JSON.stringify(ib),JSON.stringify(nb),p.id);trades.delete(x.id)},
  "trade/cancel"(p,b){const x=trades.get(parseInt(b.id));if(!x||(x.from!==p.id&&x.to!==p.id))bad("That offer is gone");trades.delete(x.id)},
- "item/remove"(p,b){adm(p);q("DELETE FROM items WHERE id=?").run(parseInt(b.id))},
+ "item/remove"(p,b){adm(p);q("UPDATE items SET listed=0 WHERE id=?").run(parseInt(b.id))},
  "admin/promote"(p,b){adm(p);const t=find(b.to);if(!t||t.id===ROOT)bad("You can’t change that player");
   q("UPDATE players SET admin=? WHERE id=?").run(t.admin?0:1,t.id);post(p.name,`${t.name} ${t.admin?"is no longer":"is now"} an admin`)},
  "admin/give"(p,b){root(p);const t=find(b.to),n=parseInt(b.n);if(!t||!n)bad("Pick a player and an amount");
@@ -308,9 +317,9 @@ const pub=p=>{const a=JSON.parse(p.avatar||"{}");
  return{id:p.id,name:p.name,coins:p.coins,inv:JSON.parse(p.inv||"{}"),cats:JSON.parse(p.cats||"[]"),admin:!!p.admin,banned:!!p.banned,inf:p.id===ROOT&&!!p.infinite,avatar:Object.keys(a).length?{...a,photo:p.photo?`/avatar/${p.id}?v=${p.pv}`:""}:undefined}};
 const snapshot=()=>{const on=new Set([...clients].map(c=>c.pid));return JSON.stringify({
  players:q("SELECT * FROM players").all().map(p=>({...pub(p),online:on.has(p.id)})),
- items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal",seller:i.seller||"",img:i.img?`/img/item/${i.id}`:""})),
- cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,price:c.price||0,listed:c.listed!==0,img:c.img?`/img/cat/${c.id}`:""})),
- moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,fx:fxInfo(k)})),
+ items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal",seller:i.seller||"",listed:i.listed!==0,img:i.img?`/img/item/${i.id}`:""})),
+ cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,price:c.price||0,stock:c.stock==null?-1:c.stock,listed:c.listed!==0,img:c.img?`/img/cat/${c.id}`:""})),
+ moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,listed:k.listed!==0,fx:fxInfo(k)})),
  messages:q("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all()})};
 function sendTo(c,base){const m=find(c.pid);if(!m)return;
  c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),daily:m.daily,moves:JSON.parse(m.moves||"[]"),eqc:Object.fromEntries(JSON.parse(m.cats||"[]").map(id=>[id,equippedFor(m,id)])),battle:inBattle(m.id)||null,trades:[...trades.values()].filter(x=>x.from===m.id||x.to===m.id).map(({id,from,to,give,want})=>({id,from,to,give,want})),blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined,notes:q("SELECT id,text FROM notes WHERE pid=? ORDER BY id").all(m.id),words:m.admin?q("SELECT w FROM badwords ORDER BY w").all().map(r=>r.w):undefined})+"}\n\n")}
