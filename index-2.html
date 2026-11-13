@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CatChat</title>
+<style>
+:root{--bg:#f5f2ff;--panel:#fff;--ink:#1d1a33;--mute:#6b678a;--line:#e0dbf5;--coin:#e8a400;--accent:#0f9d73;--danger:#d64550;--me:#e6e0ff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+:root:not([data-theme="light"]){}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12142a;--panel:#1b1e3a;--ink:#f1eeff;--mute:#9a97c4;--line:#2d3160;--coin:#ffc93c;--accent:#5be3b0;--danger:#ff7b84;--me:#2a2f66;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12142a;--panel:#1b1e3a;--ink:#f1eeff;--mute:#9a97c4;--line:#2d3160;--coin:#ffc93c;--accent:#5be3b0;--danger:#ff7b84;--me:#2a2f66;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+*{box-sizing:border-box}
+body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:400 16px/1.45 ui-rounded,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;border-radius:10px;padding:.5em .9em;background:var(--accent);color:#07241b;font-weight:600}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+button.bad{background:var(--danger);color:#fff}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,textarea{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:.55em .75em;width:100%}
+#login{height:100%;display:grid;place-items:center;padding:1rem}
+#login form{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:1.6rem;width:min(380px,100%);display:grid;gap:.8rem}
+#login h1{margin:0;font-size:1.9rem}
+#login p{margin:0;color:var(--mute)}
+#err{color:var(--danger);min-height:1.3em;font-size:.9rem}
+#app{height:100%;display:none;flex-direction:column}
+header{display:flex;align-items:center;gap:.8rem;padding:.6rem 1rem;border-bottom:1px solid var(--line);background:var(--panel)}
+header b{font-size:1.15rem;flex:1}
+.coins{color:var(--coin);font-weight:600;white-space:nowrap}
+nav{display:flex;gap:.4rem;padding:.5rem 1rem;border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{background:transparent;color:var(--mute);border:1px solid transparent}
+nav button.on{background:var(--panel);color:var(--ink);border-color:var(--line)}
+main{flex:1;min-height:0;display:flex;justify-content:center}
+.pane{display:none;min-height:0;flex:1;max-width:760px;width:100%}
+#log{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.45rem}
+.m{max-width:85%;padding:.45rem .75rem;border-radius:14px;background:var(--panel);border:1px solid var(--line);overflow-wrap:anywhere}
+.m.me{align-self:flex-end;background:var(--me)}
+.m .n{font-weight:600;font-size:.85rem;color:var(--accent)}
+.m .x{background:none;color:var(--danger);padding:0 .3em;margin-left:.3em}
+.sys{align-self:center;color:var(--mute);font-size:.88rem;text-align:center}
+#send{display:flex;gap:.5rem;padding:.7rem 1rem;border-top:1px solid var(--line)}
+.scroll{overflow-y:auto;padding:1rem;gap:.7rem;align-content:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:.8rem;display:flex;gap:.8rem;align-items:center}
+.card .e{font-size:2rem}.card .i{flex:1;min-width:0}.card small{color:var(--mute);display:block}
+.price{color:var(--coin);font-weight:600}
+h2{margin:.2rem 0;font-size:1.05rem}
+.row{display:flex;gap:.5rem;flex-wrap:wrap}.row>*{flex:1;min-width:90px}
+.empty{color:var(--mute);padding:1rem;text-align:center}
+#toast{position:fixed;left:50%;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.5em 1em;border-radius:10px;display:none;z-index:9}
+.tag{font-size:.75rem;background:var(--coin);color:#2b1d00;border-radius:6px;padding:0 .4em;margin-left:.3em}
+body[data-tab=chat] #p-chat{display:flex;flex-direction:column}
+body[data-tab=shop] #p-shop,body[data-tab=battle] #p-battle,body[data-tab=trade] #p-trade,body[data-tab=wallet] #p-wallet,body[data-tab=settings] #p-settings,body[data-tab=admin] #p-admin{display:grid}
+.mw{display:flex;gap:.5rem;align-items:flex-end;max-width:92%}
+.mw.me{align-self:flex-end;flex-direction:row-reverse}
+.av{width:36px;height:36px;border-radius:50%;flex:none;background:var(--line);object-fit:cover;overflow:visible}
+.av.big{width:104px;height:104px}
+.noav .mw .avw{display:none}
+.avw{position:relative;display:inline-block;flex:none;line-height:0}
+.dot{position:absolute;right:0;bottom:0;width:28%;height:28%;min-width:9px;min-height:9px;border-radius:50%;background:#2ecc71;border:2px solid var(--panel)}
+.big-bal{font-size:2.5rem;font-weight:600;color:var(--coin);line-height:1.1}
+.set{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:.9rem;display:grid;gap:.6rem}
+.sw,.seg{display:flex;gap:.45rem;flex-wrap:wrap}
+.sw button{width:32px;height:32px;padding:0;border-radius:50%;border:2px solid var(--line)}
+.sw button.on,.seg button.on{outline:2px solid var(--accent);outline-offset:2px}
+.seg button{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.set label.t{display:flex;gap:.6rem;align-items:center}
+.set input[type=checkbox]{width:auto}
+select{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:.55em .75em;width:100%;color:inherit;font:inherit}
+.ico{width:48px;height:48px;border-radius:10px;object-fit:cover;background:var(--line);flex:none}
+.row>.ico{flex:none;min-width:0}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:14px}
+#cv{width:240px;height:240px;border:1px solid var(--line);touch-action:none;background:#fff;border-radius:10px;display:block;margin-bottom:.5rem}
+.fi{position:relative;text-align:center;flex:1;min-width:0}
+.fi>img,.noimg{width:min(38vw,150px);height:min(38vw,150px);object-fit:cover;border-radius:14px;background:var(--line);display:grid;place-items:center;font-size:3rem;margin:.3rem auto}
+.hp{height:10px;background:var(--line);border-radius:6px;overflow:hidden}
+.hp i{display:block;height:100%;background:var(--accent);transition:width .5s}
+.fx{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center;font-size:3.2rem}
+@keyframes pop{0%{transform:scale(.2) rotate(0);opacity:0}30%{opacity:1}100%{transform:scale(1.8) rotate(40deg);opacity:0}}
+@keyframes cut{0%{transform:scaleX(0) rotate(-35deg);opacity:1}50%{transform:scaleX(1) rotate(-35deg);opacity:1}100%{transform:scaleX(1) rotate(-35deg);opacity:0}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+.fx.fire::after{content:"🔥"}.fx.water::after{content:"💧"}.fx.bolt::after{content:"⚡"}.fx.star::after{content:"⭐"}
+.fx.fire::after,.fx.water::after,.fx.bolt::after,.fx.star::after{animation:pop .9s ease-out}
+.fx.slash::after,.fx.claw::after{content:"";display:block;width:80%;height:5px;background:#fff;box-shadow:0 0 8px #000;border-radius:3px;animation:cut .6s ease-out}
+.fx.claw::after{box-shadow:0 -16px 0 #fff,0 16px 0 #fff,0 0 8px #000}
+.hit>img,.hit>.noimg{animation:shake .45s}
+.fx img{width:80%;height:80%;object-fit:contain}
+.stage{position:relative;width:240px;height:240px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/20px 20px;margin:.5rem 0}
+.stage>*{position:absolute;inset:0;width:100%;height:100%}
+#onion{opacity:.3;pointer-events:none}
+#acv{touch-action:none}
+.apv,.th img{background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/12px 12px;border:1px solid var(--line);border-radius:8px}
+.apv{width:110px;height:110px;object-fit:contain}
+.strip{display:flex;gap:.5rem;overflow-x:auto;padding:.3rem 0}
+.th{position:relative;flex:none}.th img{width:56px;height:56px}
+.th button{position:absolute;top:-4px;right:-4px;width:20px;height:20px;padding:0;border-radius:50%;font-size:.7rem;background:var(--danger);color:#fff}
+#adlg{width:min(340px,94vw)}
+#pop{position:fixed;left:0;right:0;top:env(safe-area-inset-top,0px);z-index:10;display:grid;gap:.5rem;padding:.5rem;justify-items:center;pointer-events:none}
+#pop .pp{pointer-events:auto;background:var(--panel);border:2px solid var(--accent);border-radius:14px;padding:.7rem .9rem;box-shadow:0 6px 24px rgba(0,0,0,.3);width:min(520px,100%);display:grid;gap:.5rem}
+.tm{display:flex;justify-content:center;gap:2px;font-size:.8rem}.tm .dn{opacity:.25;filter:grayscale(1)}.tm .cu{outline:2px solid var(--accent);border-radius:50%}
+</style>
+</head>
+<body data-tab="chat" data-side="shop">
+<div id="login"><form id="lf">
+ <h1>CatChat 🐾</h1>
+ <p>Pick a name to chat, earn coins and shop. Your name stays yours.</p>
+ <input id="nm" placeholder="Username" maxlength="16" autocomplete="username">
+ <input id="pw" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
+ <p style="font-size:.85rem">New name? Just pick a password and we’ll create the account.</p>
+ <div id="err"></div>
+ <button>Log in or sign up</button>
+</form></div>
+
+<div id="app">
+ <header><b>CatChat 🐾</b><span class="coins" id="bal"></span><button class="ghost" id="out">Leave</button></header>
+ <nav id="nav"></nav>
+ <main>
+  <section class="pane" id="p-chat"><div id="log"></div>
+   <form id="send"><input id="msg" placeholder="Message, or /pay name 25" autocomplete="off" maxlength="300"><button>Send</button></form></section>
+  <section class="pane scroll" id="p-shop"></section>
+  <section class="pane scroll" id="p-battle"></section>
+  <section class="pane scroll" id="p-trade"></section>
+  <section class="pane scroll" id="p-wallet"></section>
+  <section class="pane scroll" id="p-settings"></section>
+  <section class="pane scroll" id="p-admin"></section>
+ </main>
+</div>
+<dialog id="dlg"><canvas id="cv" width="160" height="160"></canvas><div class="sw" id="dsw" style="margin-bottom:.5rem"></div>
+ <div class="row"><button type="button" class="ghost" data-d="clear">Clear</button><button type="button" class="ghost" data-d="cancel">Cancel</button><button type="button" data-d="use">Use drawing</button></div></dialog>
+<dialog id="adlg"><b>Attack animation</b>
+ <div class="seg" style="margin:.5rem 0"><button type="button" data-am="frames">Draw frames</button><button type="button" data-am="gif">Upload a GIF</button></div>
+ <div id="a-frames"><div class="stage"><img id="onion" alt="" hidden><canvas id="acv" width="160" height="160"></canvas></div>
+  <div class="sw" id="asw" style="margin-bottom:.5rem"></div>
+  <label>Brush size<input type="range" id="asz" min="2" max="20" value="6"></label>
+  <div class="row" style="margin:.5rem 0"><button type="button" class="ghost" data-aerase>Eraser</button><button type="button" class="ghost" data-aclr>Clear</button><button type="button" class="ghost" data-acopy>Copy last frame</button></div>
+  <button type="button" data-addf style="width:100%">Add frame</button>
+  <div class="strip" id="astrip"></div>
+  <label>Speed (ms per frame)<input type="number" id="ams" min="50" max="500" value="120"></label></div>
+ <div id="a-gif" hidden><input type="file" id="agif" accept="image/gif"><small>GIF up to 90 KB. Keep it small and short.</small></div>
+ <div style="display:flex;justify-content:center;margin:.6rem 0"><img id="apv" class="apv" alt="" hidden></div>
+ <div id="amsg" style="color:var(--danger);min-height:1.2em;font-size:.85rem"></div>
+ <div class="row"><button type="button" class="ghost" data-apv>Preview</button><button type="button" class="ghost" data-aclose>Close</button><button type="button" data-ause>Use this</button></div></dialog>
+<div id="pop"></div>
+<div id="toast"></div>
+
+<script>
+const ROOT="meowmaster100", $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let meId=null,players={},items={},cats={},moves={},msgs=[],tab="chat",started=false;
+const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const me=()=>players[meId], isAdmin=()=>!!(me()&&me().admin);
+const FUR=["#f2a65a","#8d8d9b","#2f2f3a","#f4efe6","#c98a5b","#e8c9a0","#7aa7c7","#d6a6e0"],EYE=["#4cc38a","#f5c542","#4aa3ff","#ff8a5c","#b07cff"],PAT=["plain","stripes","patch","muzzle"],ACC=["none","bow","crown","glasses","hat"];
+const hashStr=s=>[...s].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7);
+const defAv=n=>{const h=hashStr(String(n).toLowerCase());return{mode:"cat",fur:h%FUR.length,eyes:(h>>3)%EYE.length,pat:(h>>5)%PAT.length,acc:0}};
+function catSVG(a,cls){
+ const f=FUR[a.fur]||FUR[0],e=EYE[a.eyes]||EYE[0],p=PAT[a.pat]||"plain",c=ACC[a.acc]||"none";
+ const eye=x=>`<ellipse cx="${x}" cy="56" rx="6" ry="7" fill="${e}"/><ellipse cx="${x}" cy="56" rx="2.2" ry="5" fill="#1a1a1a"/><circle cx="${x+2}" cy="53" r="1.6" fill="#fff"/>`;
+ return `<svg class="${cls}" viewBox="0 -8 100 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><polygon points="16,42 20,8 46,26" fill="${f}"/><polygon points="84,42 80,8 54,26" fill="${f}"/><polygon points="23,33 25,17 38,27" fill="#ff9db0"/><polygon points="77,33 75,17 62,27" fill="#ff9db0"/><ellipse cx="50" cy="58" rx="36" ry="31" fill="${f}"/>`
+ +(p==="stripes"?`<path d="M50 28v10M40 30l2 8M60 30l-2 8" stroke="rgba(0,0,0,.28)" stroke-width="3" stroke-linecap="round"/>`:p==="patch"?`<ellipse cx="34" cy="52" rx="14" ry="13" fill="rgba(0,0,0,.22)"/>`:p==="muzzle"?`<ellipse cx="50" cy="71" rx="18" ry="13" fill="rgba(255,255,255,.7)"/>`:"")
+ +eye(37)+eye(63)+`<polygon points="46,66 54,66 50,71" fill="#ff7d96"/><path d="M50 71q-5 6-10 2M50 71q5 6 10 2" stroke="#3a2a2a" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M30 68l-16-3M30 72l-16 3M70 68l16-3M70 72l16 3" stroke="rgba(0,0,0,.35)" stroke-width="1.2" stroke-linecap="round"/>`
+ +(c==="bow"?`<polygon points="72,24 86,16 86,32" fill="#ff5d8f"/><polygon points="72,24 58,16 58,32" fill="#ff5d8f"/><circle cx="72" cy="24" r="4" fill="#d63b6e"/>`:c==="crown"?`<polygon points="32,26 35,6 43,18 50,3 57,18 65,6 68,26" fill="#ffc93c" stroke="#c98f00" stroke-width="1.5"/>`:c==="glasses"?`<circle cx="37" cy="56" r="10" fill="none" stroke="#222" stroke-width="2.2"/><circle cx="63" cy="56" r="10" fill="none" stroke="#222" stroke-width="2.2"/><path d="M47 56h6" stroke="#222" stroke-width="2.2"/>`:c==="hat"?`<polygon points="38,26 50,-6 62,26" fill="#7b61ff"/><circle cx="50" cy="-6" r="4" fill="#ffc93c"/>`:"")+`</svg>`;
+}
+function avHTML(p,big){
+ const a=(p&&p.avatar)||defAv((p&&p.name)||"?"),cls="av"+(big?" big":"");
+ const h=a.mode==="photo"&&typeof a.photo==="string"&&a.photo.startsWith("/avatar/")?`<img class="${cls}" alt="" src="${esc(a.photo)}">`:catSVG(a,cls);
+ return `<span class="avw">${h}${p&&p.online?'<i class="dot" title="Online"></i>':""}</span>`;
+}
+const showAv=()=>ls.get("meow-showav")!=="0";
+const applyAv=()=>document.body.classList.toggle("noav",!showAv());
+function toast(t){const e=$("#toast");e.textContent=t;e.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display="none",2600)}
+function fail(t){$("#err").textContent=t}
+
+let token=ls.get("meow-token")||"",es=null;
+function showLogin(msg){$("#app").style.display="none";$("#login").style.display="grid";fail(msg||"")}
+function logoutLocal(){ls.del("meow-token");token="";if(es){es.close();es=null}}
+async function api(a,body){
+ const r=await fetch("/api/"+a,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(body||{})});
+ const j=await r.json().catch(()=>({}));
+ if(r.status===401){logoutLocal();showLogin("Please log in again.");throw new Error("auth")}
+ if(!r.ok){toast(j.error||"That didn’t work");throw new Error(j.error||"failed")}
+ return j;
+}
+function enter(t,id){token=t;ls.set("meow-token",t);meId=id;fail("");$("#login").style.display="none";$("#app").style.display="flex";start()}
+(async()=>{
+ if(!token)return;
+ try{const r=await fetch("/api/me",{headers:{Authorization:"Bearer "+token}});
+  if(r.ok)enter(token,(await r.json()).id);else logoutLocal()}catch(e){}
+})();
+$("#lf").onsubmit=async e=>{
+ e.preventDefault();const n=$("#nm").value.trim(),pw=$("#pw").value;
+ if(!/^[A-Za-z0-9_]{2,16}$/.test(n))return fail("Use 2–16 letters, numbers or underscores.");
+ if(pw.length<6)return fail("Password must be at least 6 characters.");
+ try{
+  const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n,pw})});
+  const j=await r.json();if(!r.ok)return fail(j.error||"Couldn’t log in.");
+  enter(j.token,j.id);
+ }catch(x){fail("Couldn’t reach the server.")}
+};
+$("#out").onclick=()=>{fetch("/api/logout",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:"{}"}).finally(()=>{logoutLocal();location.reload()})};
+
+function start(){
+ applyAv();if(es)es.close();
+ es=new EventSource("/events?t="+encodeURIComponent(token));
+ es.addEventListener("state",ev=>{
+  const d=JSON.parse(ev.data);
+  players={};d.players.forEach(p=>players[p.id]=p);
+  if(players[meId])Object.assign(players[meId],d.me);
+  items={};d.items.forEach(i=>items[i.id]=i);
+  cats={};(d.cats||[]).forEach(c=>cats[c.id]=c);moves={};(d.moves||[]).forEach(k=>moves[k.id]=k);preload();
+  msgs=d.messages;renderAll();
+ });
+ es.addEventListener("bye",ev=>{logoutLocal();showLogin(ev.data==="banned"?"Your account was banned.":"Your account was deleted.")});
+ es.onerror=()=>{if(es&&es.readyState===2){logoutLocal();showLogin("Session expired. Log in again.")}};
+ setTab("chat");
+}
+function setTab(t){
+ tab=t;document.body.dataset.tab=t;
+ const tabs=[["chat","Chat"],["shop","Shop"],["battle","Battle"],["trade","Trade"],["wallet","Wallet"],["settings","Settings"]];if(isAdmin())tabs.push(["admin","Admin"]);
+ $("#nav").innerHTML=tabs.map(([k,l])=>`<button class="${t===k?"on":""}" data-t="${k}">${l}</button>`).join("");
+}
+$("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)setTab(t)};
+addEventListener("resize",()=>meId&&setTab(tab));
+
+function renderAll(){
+ if(me()&&me().banned){meId=null;$("#app").style.display="none";$("#login").style.display="grid";fail("Your account has been banned.");logoutLocal();return}
+ if(!me())return;
+ $("#bal").textContent="🪙 "+(me().inf?"∞":me().coins);
+ if(!isAdmin()&&tab==="admin")tab="shop";
+ setTab(tab);renderPop();renderChat();renderShop();renderBattle();renderTrade();renderWallet();renderSettings();renderAdmin();
+}
+function renderChat(){
+ const l=$("#log"),stick=l.scrollHeight-l.scrollTop-l.clientHeight<80;
+ l.innerHTML=msgs.map(m=>{
+  if(m.sys)return `<div class="sys">${esc(m.text)}</div>`;
+  const mine=m.name&&m.name.toLowerCase()===meId, p=players[(m.name||"").toLowerCase()];
+  return `<div class="mw ${mine?"me":""}">${avHTML(p||{name:m.name||"?"})}<div class="m ${mine?"me":""}"><div class="n">${esc(m.name)}${p&&p.admin?'<span class="tag">admin</span>':""}${isAdmin()?`<button class="x" data-del="${m.id}" title="Delete message">✕</button>`:""}</div>${esc(m.text)}</div></div>`}).join("")||'<div class="empty">No messages yet. Say hi.</div>';
+ if(stick)l.scrollTop=l.scrollHeight;
+}
+$("#log").onclick=async e=>{const id=e.target.dataset.del;if(id&&isAdmin())try{await api("admin/delmsg",{id})}catch(x){}};
+$("#send").onsubmit=async e=>{
+ e.preventDefault();const t=$("#msg").value.trim();if(!t||!me())return;$("#msg").value="";
+ try{
+  const c=t.match(/^\/pay\s+(\S+)\s+(\d+)$/i);
+  if(c)return pay(c[1],+c[2]);
+  if(t[0]==="/")return toast("Try /pay name 25");
+  await api("send",{text:t});
+ }catch(x){}
+};
+async function pay(to,amt){await api("pay",{to,amt});toast(`Sent ${amt} coins to ${to}`)}
+
+const MAX_SELL=5,ico=i=>i.img?`<img class="ico" src="${esc(i.img)}" alt="">`:`<div class="e">${esc(i.emoji||"🎁")}</div>`;
+function renderShop(){
+ const box=$("#p-shop"),m=me();
+ if(!$("#sf"))box.innerHTML=`<h2>Sell an item</h2><form id="sf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji (if no picture)" maxlength="4"><input name="name" placeholder="Item name" required maxlength="40"></div>${imgField("sell")}<input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="1" max="1000000" placeholder="Price each" required><input name="qty" type="number" min="1" max="99" placeholder="How many (blank = unlimited)"></div><select name="kind"><option value="normal">Normal (buyers can sell it back)</option><option value="fun">Useless (buyers can throw it away)</option><option value="physical">Real (you hand it over in real life)</option></select><button>List for sale</button><small id="slots"></small><small id="fee"></small></form><h2>Shop</h2><div id="shoplist" style="display:grid;gap:.7rem"></div><h2>Cats</h2><div id="catlist" style="display:grid;gap:.7rem"></div>`;
+ const mine=Object.values(items).filter(i=>i.seller===meId&&i.stock!==0).length,full=!isAdmin()&&mine>=MAX_SELL;
+ $("#slots").textContent=isAdmin()?`${mine} listed · admins can sell unlimited items`:`${mine}/${MAX_SELL} items listed`;
+ const pr=parseInt($("#sf [name=price]").value)||0,qs=$("#sf [name=qty]").value.trim(),inf=qs==="",qn=inf?1:Math.min(99,Math.max(1,parseInt(qs)||1));
+ const fee=isAdmin()?0:Math.ceil(pr*qn*.2),earn=Math.floor(pr*(inf?.05:.5));
+ $("#fee").textContent=pr?`${fee?`Listing fee: ${fee} coins (20%${inf?" of one item":""}). `:"No listing fee for admins. "}You earn ${earn} coins (${inf?"5%":"50%"}) each time one sells.`:'Listing costs 20% of the price. You earn 50% of the price per sale, or 5% if you leave "How many" blank for unlimited.';
+ $("#sf button:not([type])").disabled=full;
+ const list=Object.entries(items).filter(([,i])=>!(i.seller&&i.stock===0));
+ $("#shoplist").innerHTML=list.length?list.map(([id,i])=>{
+  const out=i.stock===0,own=i.seller===meId,poor=m&&!m.inf&&m.coins<i.price,sp=i.seller&&players[i.seller];
+  return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}<small>${esc(i.desc||"")}${i.stock>0?` · ${i.stock} left`:""}</small>${i.seller?`<small>Sold by ${esc(sp?sp.name:"a cat")}</small>`:""}<span class="price">${i.price?"🪙 "+i.price:"Free"}</span></div>${own?`<button class="ghost" data-cancel="${id}">Cancel</button>`:`<button data-buy="${id}" ${out||poor?"disabled":""}>${out?"Sold out":i.price?"Buy":"Get"}</button>`}</div>`}).join(""):`<div class="empty">Nothing for sale yet. List the first item above!</div>`;
+ const oc=m.cats||[];
+ $("#catlist").innerHTML=Object.values(cats).map(c=>{const has=oc.includes(c.id),poor=!m.inf&&m.coins<c.price;return `<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b><small>${c.hp} HP</small><span class="price">${c.price?"🪙 "+c.price:"Free"}</span></div><button data-bcat="${c.id}" ${has||poor?"disabled":""}>${has?"Owned":c.price?"Buy":"Get"}</button></div>`}).join("")||'<div class="empty">No cats for sale yet.</div>';
+}
+$("#p-shop").oninput=e=>{if(e.target.name==="price"||e.target.name==="qty")renderShop()};
+$("#p-shop").onclick=async e=>{
+ const d=e.target.dataset;
+ try{
+  if(d.buy){await api("buy",{id:d.buy});toast("Bought "+(items[d.buy]?items[d.buy].name:"item"))}
+  else if(d.cancel){await api("item/cancel",{id:d.cancel});toast("Listing cancelled")}
+  else if(d.bcat){await api("cat/buy",{id:d.bcat});toast("Cat added to your collection")}
+ }catch(x){}
+};
+$("#p-shop").onsubmit=async e=>{
+ e.preventDefault();const f=new FormData(e.target);
+ try{await api("item/sell",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),qty:f.get("qty"),kind:f.get("kind"),img:imgs.sell});setImg("sell","");e.target.reset();toast("Listed for sale")}catch(x){}
+};
+
+function renderWallet(){
+ const m=me(),box=$("#p-wallet");if(!m)return;
+ if(box.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;
+ const R=meId===ROOT,left=864e5-(Date.now()-(m.daily||0));
+ const inv=Object.entries(m.inv||{}).filter(([id])=>items[id]);
+ const isR=p=>p.name.toLowerCase()===ROOT;
+ const top=Object.values(players).filter(p=>!p.banned).sort((a,b)=>(b.inf?1:0)-(a.inf?1:0)||b.coins-a.coins).slice(0,8);
+ const names=Object.values(players).filter(p=>p.name.toLowerCase()!==meId&&!p.banned);
+ box.innerHTML=`<div class="set" style="text-align:center"><small style="color:var(--mute)">Your balance</small><div class="big-bal">🪙 ${m.inf?"∞":m.coins}</div><button data-daily ${left>0?"disabled":""}>${left>0?`Daily bonus in ${Math.ceil(left/36e5)}h`:"Claim 50 daily coins"}</button></div>
+ <h2>Send coins</h2><form id="payf" class="set"><div class="row"><input name="to" list="plist" placeholder="Player name" required maxlength="16" autocomplete="off"><input name="amt" type="number" min="1" placeholder="Amount" required></div><datalist id="plist">${names.map(p=>`<option value="${esc(p.name)}">`).join("")}</datalist><button>Send</button></form>
+ <h2>Your items</h2>${inv.length?inv.map(([id,n])=>{const i=items[id];return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}</div><b>×${n}</b>${i.kind==="fun"?`<button class="ghost" data-discard="${id}">Get rid of</button>`:(i.kind||"normal")==="normal"&&i.price>0?`<button class="ghost" data-sell="${id}">Sell 🪙${Math.floor(i.price*.7)}</button>`:""}</div>`}).join(""):'<div class="empty">Nothing yet. Visit the shop.</div>'}
+ <h2>Richest cats</h2>${top.map((p,i)=>`<div class="card">${avHTML(p)}<div class="i"><b>${i+1}. ${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}</div><span class="price">🪙 ${p.inf?"∞":p.coins}</span></div>`).join("")}`;
+}
+$("#p-wallet").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await pay(String(f.get("to")).trim(),parseInt(f.get("amt")));e.target.reset()}catch(x){}};
+
+function renderSettings(){
+ const m=me();if(!m)return;
+ if(document.activeElement&&document.activeElement.id==="dpw")return;
+ const a=m.avatar||defAv(m.name);
+ const sw=(arr,k,cur)=>arr.map((c,i)=>`<button type="button" style="background:${c}" class="${cur===i?"on":""}" data-${k}="${i}" aria-label="${k} option ${i+1}"></button>`).join("");
+ const opt=(arr,k,cur)=>arr.map((n,i)=>`<button type="button" class="${cur===i?"on":""}" data-${k}="${i}">${n}</button>`).join("");
+ $("#p-settings").innerHTML=`<div class="set" style="justify-items:center;text-align:center">${avHTML({...m,avatar:a},true)}<b>${esc(m.name)}</b></div>
+ <h2>Profile picture</h2><div class="set"><div class="seg"><button type="button" class="${a.mode!=="photo"?"on":""}" data-mode="cat">Cartoon cat</button><button type="button" class="${a.mode==="photo"?"on":""}" data-mode="photo" ${a.photo?"":"disabled"}>My photo</button></div>
+ <label>Upload a picture<input type="file" id="up" accept="image/*"></label>${a.photo?'<button type="button" class="ghost" data-rmphoto>Remove my photo</button>':""}</div>
+ <h2>Customize your cat</h2><div class="set"><b>Fur</b><div class="sw">${sw(FUR,"fur",a.fur)}</div><b>Eyes</b><div class="sw">${sw(EYE,"eyes",a.eyes)}</div><b>Pattern</b><div class="seg">${opt(["Plain","Stripes","Patch","Muzzle"],"pat",a.pat)}</div><b>Accessory</b><div class="seg">${opt(["None","Bow","Crown","Glasses","Hat"],"acc",a.acc)}</div><button type="button" class="ghost" data-rand>Surprise me</button></div>
+ <h2>Display</h2><div class="set"><label class="t"><input type="checkbox" id="showav" ${showAv()?"checked":""}>Show profile pictures in chat</label></div>${meId===ROOT?"":`<h2>Delete account</h2><div class="set"><input type="password" id="dpw" placeholder="Your password" autocomplete="current-password"><button class="bad" data-delme>Delete my account</button></div>`}`;
+}
+async function saveAv(patch){
+ const m=me();if(!m)return;
+ try{await api("avatar",{...(m.avatar||defAv(m.name)),...patch})}catch(x){}
+}
+$("#p-settings").onclick=e=>{
+ const b=e.target.closest("button"),d=b&&b.dataset;if(!d)return;const r=n=>Math.floor(Math.random()*n);
+ if(d.mode)saveAv({mode:d.mode});
+ else if(d.fur!==undefined)saveAv({mode:"cat",fur:+d.fur});
+ else if(d.eyes!==undefined)saveAv({mode:"cat",eyes:+d.eyes});
+ else if(d.pat!==undefined)saveAv({mode:"cat",pat:+d.pat});
+ else if(d.acc!==undefined)saveAv({mode:"cat",acc:+d.acc});
+ else if(d.rand!==undefined)saveAv({mode:"cat",fur:r(FUR.length),eyes:r(EYE.length),pat:r(PAT.length),acc:r(ACC.length)});
+ else if(d.rmphoto!==undefined)saveAv({mode:"cat",photo:""});
+ else if(d.delme!==undefined){const pw=$("#dpw").value;if(!pw)return toast("Type your password");if(confirm("Delete your account for good?"))api("deleteMe",{pw}).catch(()=>{})}
+};
+$("#p-settings").onchange=e=>{
+ if(e.target.id==="showav"){ls.set("meow-showav",e.target.checked?"1":"0");applyAv()}
+ else if(e.target.id==="up"){
+  const f=e.target.files[0];if(!f||!f.type.startsWith("image/"))return toast("Choose an image file");
+  const rd=new FileReader();rd.onload=()=>{const img=new Image();img.onload=()=>{
+   const c=document.createElement("canvas");c.width=c.height=96;const s=Math.min(img.width,img.height);
+   c.getContext("2d").drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,96,96);
+   saveAv({mode:"photo",photo:c.toDataURL("image/jpeg",.8)});
+  };img.onerror=()=>toast("Couldn’t read that image");img.src=rd.result};rd.readAsDataURL(f);
+ }
+};
+$("#p-wallet").onclick=async e=>{
+ const d=e.target.dataset;
+ try{if("daily" in d){await api("daily");toast("+50 coins")}
+ else if(d.sell){await api("sell",{id:d.sell});toast("Sold")}
+ else if(d.discard)await api("discard",{id:d.discard})}catch(x){}
+};
+
+const animSel=`<select name="anim">${["slash","claw","fire","water","bolt","star"].map(a=>`<option>${a}</option>`).join("")}</select>`;
+function renderAdmin(){
+ const box=$("#p-admin");if(!isAdmin()){box.innerHTML="";return}
+ if(box.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName))return;
+ const ps=Object.entries(players).sort((a,b)=>a[1].name.localeCompare(b[1].name)),R=meId===ROOT,blk=me().blocked||[];
+ const keep=[...box.querySelectorAll("form [name]")].filter(i=>i.type!=="file").map(i=>[i.form.id,i.name,i.value]);
+ box.innerHTML=`<h2>Add shop item</h2>
+ <form id="af" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji (if no picture)" maxlength="4"><input name="name" placeholder="Item name" required maxlength="40"></div>${imgField("item")}
+ <input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="0" placeholder="Price (0 = free)" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div>
+ <select name="kind"><option value="normal">Normal item (can be sold back)</option><option value="fun">Fun item (can be thrown away)</option><option value="physical">Real item (a real prize)</option></select><button>Add item</button></form>
+ <h2>Items</h2>${Object.entries(items).map(([id,i])=>`<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b><small>${i.price?"🪙 "+i.price:"Free"}${i.seller?" · player listing":""}</small></div><button class="bad" data-rm="${id}">Remove</button></div>`).join("")||'<div class="empty">No items.</div>'}
+ <h2>Create a cat</h2><form id="cf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Cat name" required maxlength="30"><input name="hp" type="number" min="1" max="10000000" placeholder="HP (like 50)" required><input name="price" type="number" min="0" placeholder="Price (0 = free)"></div>${imgField("cat")}<button>Create cat</button></form>
+ ${Object.values(cats).map(c=>`<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b><small>${c.hp} HP · ${c.price?"🪙 "+c.price:"free"}</small></div><button class="bad" data-rmcat="${c.id}">Remove</button></div>`).join("")}
+ <h2>Create an ability</h2><form id="mf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Ability name" required maxlength="30"><input name="damage" type="number" min="1" placeholder="Damage" required><input name="price" type="number" min="0" placeholder="Price (0 = free)" required></div>
+ <div class="row" style="align-items:center">${animSel}<button type="button" class="ghost" data-pvbtn>Preview animation</button><div class="fi" data-pid="__pv" style="flex:none;min-width:70px;width:70px"><div class="noimg" style="width:70px;height:70px;font-size:2rem">🐱</div><span class="fx"></span></div></div><div class="row"><button type="button" class="ghost" data-afxopen>Draw / upload animation…</button><button type="button" class="ghost" data-afxrm>Remove custom</button></div><small id="afxsum"></small><button>Create ability</button></form>
+ ${Object.values(moves).map(k=>`<div class="card"><div class="i"><b>${esc(k.name)}</b><small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)} · 🪙 ${k.price}</small></div><button class="bad" data-rmmove="${k.id}">Remove</button></div>`).join("")}
+ <h2>Players</h2>${ps.map(([id,p])=>{const self=id===ROOT;return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}<small>🪙 ${p.inf?"∞":p.coins}</small></div>${self?"":`<button class="ghost" data-adm="${id}">${p.admin?"Remove admin":"Make admin"}</button>`}${R&&!self?`<div class="row" style="flex-basis:100%"><input type="number" placeholder="Coins (− takes)" data-amt="${id}"><button data-give="${id}">Give</button><button class="bad" data-ban="${id}">Ban + delete</button></div>`:""}</div>`}).join("")}
+ ${R?`<button class="ghost" data-inf>${me().inf?"Turn infinite coins off":"Turn infinite coins on"}</button>${blk.length?`<h2>Banned names</h2>${blk.map(id=>`<div class="card"><div class="i"><b>${esc(id)}</b></div><button class="ghost" data-unban="${esc(id)}">Let them sign up again</button></div>`).join("")}`:""}`:""}
+ <h2>Banned username words</h2><form id="wf" class="card" style="display:flex;gap:.5rem;flex-wrap:wrap"><input name="w" placeholder="Word to block in usernames" maxlength="16" required><button>Ban word</button></form>${(me().words||[]).map(w=>`<div class="card"><div class="i"><b>${esc(w)}</b></div><button class="ghost" data-unw="${esc(w)}">Remove</button></div>`).join("")}
+ <h2>Chat</h2><button class="bad" data-clear>Clear all messages</button>`;
+ for(const[f,n,v]of keep){const el=box.querySelector(`#${f} [name=${n}]`);if(el)el.value=v}
+ afxSummary();
+}
+$("#p-admin").onsubmit=async e=>{
+ e.preventDefault();if(!isAdmin())return;const f=new FormData(e.target),id=e.target.id;
+ try{
+  if(id==="af"){await api("item/add",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),stock:f.get("stock"),kind:f.get("kind"),img:imgs.item});setImg("item","");toast("Item added")}
+  else if(id==="wf"){await api("word/ban",{w:f.get("w")});toast("Word banned")}
+  else if(id==="cf"){await api("cat/add",{name:f.get("name"),hp:f.get("hp"),price:f.get("price"),img:imgs.cat});setImg("cat","");toast("Cat created")}
+  else if(id==="mf"){await api("move/add",{name:f.get("name"),damage:f.get("damage"),price:f.get("price"),anim:f.get("anim"),fx:afx&&afx.t==="gif"?{t:"gif",g:afx.url}:afx&&afx.t==="frames"?{t:"frames",f:afx.urls,ms:afx.ms}:null});afx=null;afr=[];agif="";afxSummary();toast("Ability created")}
+  e.target.reset();
+ }catch(x){}
+};
+$("#p-admin").onclick=async e=>{
+ if(!isAdmin())return;const d=e.target.dataset;
+ try{
+  if(d.rm)await api("item/remove",{id:d.rm});
+  else if(d.rmcat)await api("cat/remove",{id:d.rmcat});
+  else if(d.rmmove)await api("move/remove",{id:d.rmmove});
+  else if("pvbtn" in d)play("__pv",document.querySelector("#mf [name=anim]").value,afx);
+  else if("afxopen" in d){$("#adlg").showModal();renderA()}
+  else if("afxrm" in d){afx=null;afxSummary()}
+  else if(d.adm)await api("admin/promote",{to:d.adm});
+  else if(d.give&&meId===ROOT){const n=parseInt(document.querySelector(`[data-amt="${d.give}"]`).value);if(!n)return toast("Enter an amount");await api("admin/give",{to:d.give,n})}
+  else if(d.ban&&meId===ROOT){if(confirm("Ban this player and delete their account and chat history?"))await api("admin/ban",{to:d.ban})}
+  else if(d.unw)await api("word/unban",{w:d.unw});
+  else if(d.unban&&meId===ROOT)await api("admin/unban",{to:d.unban});
+  else if("inf" in d&&meId===ROOT){const on=!me().inf;await api("infinite",{on});toast(on?"Infinite coins ON":"Infinite coins OFF")}
+  else if("clear" in d){const b=e.target;if(!b.dataset.sure){b.dataset.sure="1";b.textContent="Click again to delete everything";setTimeout(()=>{b.dataset.sure="";b.textContent="Clear all messages"},3000)}else await api("admin/clear")}
+ }catch(x){}
+};
+
+// ---- picture picker: upload or draw, shrunk before it is sent
+const imgs={};let dk="";
+const setImg=(k,u)=>{if(u)imgs[k]=u;else delete imgs[k];document.querySelectorAll(`[data-prev="${k}"]`).forEach(i=>{i.src=u||"";i.hidden=!u})};
+const imgField=k=>`<div class="row" style="align-items:center"><input type="file" accept="image/*" data-img="${k}"><button type="button" class="ghost" data-draw="${k}">Draw one</button><img class="ico" data-prev="${k}" src="${imgs[k]||""}" ${imgs[k]?"":"hidden"} alt=""></div>`;
+document.addEventListener("change",e=>{
+ const k=e.target.dataset&&e.target.dataset.img,f=k&&e.target.files[0];if(!f)return;
+ if(!f.type.startsWith("image/"))return toast("Choose an image file");
+ const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{
+  const c=document.createElement("canvas");c.width=c.height=128;const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,128,128);
+  const s=Math.min(im.width,im.height);x.drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,128,128);setImg(k,c.toDataURL("image/jpeg",.8));
+ };im.onerror=()=>toast("Couldn’t read that image");im.src=rd.result};rd.readAsDataURL(f);
+});
+const cv=$("#cv"),cx=cv.getContext("2d");let pen="#000",down=false;
+const clr=()=>{cx.fillStyle="#fff";cx.fillRect(0,0,160,160)};
+const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*160/r.width,(e.clientY-r.top)*160/r.height]};
+cv.onpointerdown=e=>{down=true;cv.setPointerCapture(e.pointerId);const[x,y]=pt(e);cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+.1,y);cx.strokeStyle=pen;cx.lineWidth=6;cx.lineCap=cx.lineJoin="round";cx.stroke()};
+cv.onpointermove=e=>{if(!down)return;const[x,y]=pt(e);cx.lineTo(x,y);cx.stroke()};
+cv.onpointerup=cv.onpointercancel=()=>{down=false};
+$("#dsw").innerHTML=["#000","#d64550","#e8a400","#0f9d73","#4aa3ff","#b07cff","#8b5a2b","#fff"].map(c=>`<button type="button" style="background:${c}" data-pen="${c}" aria-label="Colour ${c}"></button>`).join("");
+$("#dlg").onclick=e=>{const d=e.target.dataset;if(d.pen)pen=d.pen;else if(d.d==="clear")clr();else if(d.d==="cancel")$("#dlg").close();else if(d.d==="use"){setImg(dk,cv.toDataURL("image/jpeg",.8));$("#dlg").close()}};
+document.addEventListener("click",e=>{const k=e.target.dataset&&e.target.dataset.draw;if(k){dk=k;clr();$("#dlg").showModal()}});
+
+// ---- custom attack animations (draw frames or upload a GIF)
+let afx=null,afr=[],agif="",amode="frames",apen="#000",aerase=false,apvT=0;const pre={};
+function preload(){for(const k of Object.values(moves)){if(!k.fx||pre[k.id])continue;pre[k.id]=1;(k.fx.urls||[k.fx.url]).forEach(u=>{new Image().src=u})}}
+function afxSummary(){const e=$("#afxsum");if(e)e.textContent=afx&&afx.t==="frames"?`Custom animation: ${afx.urls.length} frame(s)`:afx&&afx.t==="gif"?"Custom animation: GIF":"No custom animation, using the built-in one picked above."}
+const amsg=t=>{$("#amsg").textContent=t||""},ams=()=>Math.min(500,Math.max(50,parseInt($("#ams").value)||120));
+function renderA(){
+ $("#a-frames").hidden=amode!=="frames";$("#a-gif").hidden=amode!=="gif";
+ document.querySelectorAll("#adlg [data-am]").forEach(b=>b.classList.toggle("on",b.dataset.am===amode));
+ $("#astrip").innerHTML=afr.map((u,i)=>`<div class="th"><img src="${u}" alt="Frame ${i+1}"><button type="button" data-fdel="${i}" aria-label="Delete frame ${i+1}">✕</button></div>`).join("")||"<small>No frames yet. Draw, then press Add frame.</small>";
+ const o=$("#onion");o.hidden=!afr.length;if(afr.length)o.src=afr[afr.length-1];
+}
+const acv=$("#acv"),ax=acv.getContext("2d");let adown=false,alast=null;
+const apt=e=>{const r=acv.getBoundingClientRect();return[(e.clientX-r.left)*160/r.width,(e.clientY-r.top)*160/r.height]};
+const aseg=(a,b)=>{ax.globalCompositeOperation=aerase?"destination-out":"source-over";ax.strokeStyle=apen;ax.lineWidth=(+$("#asz").value||6)*(aerase?2:1);ax.lineCap=ax.lineJoin="round";ax.beginPath();ax.moveTo(a[0],a[1]);ax.lineTo(b[0]+.1,b[1]);ax.stroke()};
+acv.onpointerdown=e=>{adown=true;acv.setPointerCapture(e.pointerId);alast=apt(e);aseg(alast,alast)};
+acv.onpointermove=e=>{if(!adown)return;const p=apt(e);aseg(alast,p);alast=p};
+acv.onpointerup=acv.onpointercancel=()=>{adown=false};
+$("#asw").innerHTML=["#000","#d64550","#e8a400","#0f9d73","#4aa3ff","#b07cff","#8b5a2b","#fff"].map(c=>`<button type="button" style="background:${c}" data-apen="${c}" aria-label="Colour ${c}"></button>`).join("");
+function frameURL(){for(const s of[128,96,64]){const c=document.createElement("canvas");c.width=c.height=s;c.getContext("2d").drawImage(acv,0,0,s,s);const u=c.toDataURL("image/png");if(u.length<29000)return u}return""}
+$("#adlg").onclick=e=>{const b=e.target.closest("button");if(!b)return;const d=b.dataset;amsg("");
+ if(d.am){amode=d.am;renderA()}
+ else if(d.apen){apen=d.apen;aerase=false;document.querySelector("[data-aerase]").classList.remove("on")}
+ else if("aerase" in d){aerase=!aerase;b.classList.toggle("on",aerase)}
+ else if("aclr" in d)ax.clearRect(0,0,160,160);
+ else if("acopy" in d){if(!afr.length)return amsg("No frame to copy yet.");const im=new Image();im.onload=()=>{ax.globalCompositeOperation="source-over";ax.clearRect(0,0,160,160);ax.drawImage(im,0,0,160,160)};im.src=afr[afr.length-1]}
+ else if("addf" in d){if(afr.length>=12)return amsg("12 frames is the max.");const u=frameURL();if(!u)return amsg("That frame is too detailed. Draw something simpler.");if(afr.reduce((n,x)=>n+x.length,u.length)>115000)return amsg("Too much detail overall. Use simpler frames.");afr.push(u);ax.clearRect(0,0,160,160);renderA()}
+ else if(d.fdel!==undefined){afr.splice(+d.fdel,1);renderA()}
+ else if("apv" in d){clearInterval(apvT);const v=$("#apv");if(amode==="gif"){if(!agif)return amsg("Choose a GIF first.");v.src=agif;v.hidden=false}else{if(!afr.length)return amsg("Add a frame first.");let k=0;v.hidden=false;v.src=afr[0];apvT=setInterval(()=>{k=(k+1)%afr.length;v.src=afr[k]},ams())}}
+ else if("aclose" in d)$("#adlg").close();
+ else if("ause" in d){if(amode==="frames"){if(!afr.length)return amsg("Add at least one frame first.");afx={t:"frames",urls:[...afr],ms:ams()}}else{if(!agif)return amsg("Choose a GIF first.");afx={t:"gif",url:agif}}afxSummary();$("#adlg").close()}
+};
+$("#adlg").onclose=()=>clearInterval(apvT);
+$("#agif").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;amsg("");
+ if(f.type!=="image/gif")return amsg("Choose a .gif file.");
+ if(f.size>90000)return amsg("That GIF is over 90 KB. Try fewer frames or a smaller size.");
+ const rd=new FileReader();rd.onload=()=>{agif=rd.result;const v=$("#apv");v.src=agif;v.hidden=false};rd.readAsDataURL(f)};
+
+// ---- pop-ups at the top: battle challenges, trade offers, "hand it over" notices
+let psig="";
+function renderPop(){
+ const m=me(),box=$("#pop");if(!m)return;
+ const b=m.battle&&m.battle.state==="pending"&&m.battle.b.pid===meId?m.battle:null,
+  ts=(m.trades||[]).filter(t=>t.to===meId),ns=m.notes||[],oc=(m.cats||[]).filter(id=>cats[id]);
+ const sg=JSON.stringify([b&&b.id,ts.map(t=>t.id),ns.map(n=>n.id),oc]);if(sg===psig)return;psig=sg;
+ box.innerHTML=(b?`<div class="pp"><b>⚔️ ${esc(b.a.name)} challenges you with ${esc(b.a.cat.name)}!${b.bet?` Bet: ${b.bet} coins each.`:""}</b>${oc.length?`<select data-pcat>${oc.map(id=>`<option value="${id}">${esc(cats[id].name)} · ${cats[id].hp} HP</option>`).join("")}</select>`:"<small>You need a cat first. Get one in the Shop tab.</small>"}<div class="row"><button data-pacc="${b.id}" ${oc.length?"":"disabled"}>Yes</button><button class="ghost" data-pno>Cancel</button></div></div>`:"")
+ +ts.map(t=>`<div class="pp"><b>🔁 ${nm(t.from)} offers you a trade</b><small>They give you ${fmt(t.give)}. They want ${fmt(t.want)}.</small><div class="row"><button data-ptacc="${t.id}">Yes</button><button class="ghost" data-ptcan="${t.id}">Cancel</button></div></div>`).join("")
+ +ns.map(n=>`<div class="pp"><b>📦 ${esc(n.text)}</b><div class="row"><button data-pnote="${n.id}">OK</button></div></div>`).join("");
+}
+$("#pop").onclick=async e=>{const d=e.target.dataset;
+ try{
+  if(d.pacc){const c=document.querySelector("#pop [data-pcat]");await api("battle/accept",{id:d.pacc,cat:c&&c.value});setTab("battle")}
+  else if("pno" in d)await api("battle/leave");
+  else if(d.ptacc){await api("trade/accept",{id:d.ptacc});toast("Trade done")}
+  else if(d.ptcan)await api("trade/cancel",{id:d.ptcan});
+  else if(d.pnote)await api("note/dismiss",{id:d.pnote});
+ }catch(x){}
+};
+
+// ---- trading (items and cats only)
+let tr={to:"",gi:{},gc:[],wi:{},wc:[]},tsig="";
+const nm=id=>players[id]?esc(players[id].name):"someone";
+const fmt=t=>[...Object.entries(t.items).map(([id,n])=>`${items[id]?esc(items[id].name):"an item"} ×${n}`),...t.cats.map(id=>`${cats[id]?esc(cats[id].name):"a cat"} (cat)`)].join(", ")||"nothing";
+function renderTrade(){
+ const m=me(),box=$("#p-trade");if(!m)return;
+ const others=Object.values(players).filter(p=>p.id!==meId&&!p.banned);
+ if(!others.find(p=>p.id===tr.to))tr.to=others[0]?others[0].id:"";
+ const o=players[tr.to],sg=JSON.stringify([m.trades,m.inv,m.cats,Object.keys(cats),Object.keys(items),o&&[o.inv,o.cats],others.length]);
+ if(sg===tsig)return;tsig=sg;
+ const rowsI=(inv,k)=>Object.entries(inv||{}).filter(([id])=>items[id]).map(([id,n])=>`<div class="row" style="align-items:center"><span>${esc(items[id].name)} (has ${n})</span><input type="number" min="0" max="${n}" value="${tr[k][id]||0}" data-${k}="${id}" style="max-width:90px"></div>`).join("");
+ const rowsC=(own,k)=>(own||[]).filter(id=>cats[id]).map(id=>`<label class="t"><input type="checkbox" data-${k}="${id}" ${tr[k].includes(id)?"checked":""}>${esc(cats[id].name)} (cat)</label>`).join("");
+ const open=(m.trades||[]).map(t=>t.to===meId?`<div class="card" style="flex-wrap:wrap"><div class="i"><b>${nm(t.from)}</b> gives you ${fmt(t.give)}<small>and wants ${fmt(t.want)}</small></div><button data-tacc="${t.id}">Accept</button><button class="ghost" data-tcan="${t.id}">Decline</button></div>`:`<div class="card" style="flex-wrap:wrap"><div class="i">You give ${nm(t.to)} ${fmt(t.give)}<small>for ${fmt(t.want)}</small></div><button class="ghost" data-tcan="${t.id}">Cancel</button></div>`).join("");
+ box.innerHTML=`<h2>Offers</h2>${open||'<div class="empty">No open offers.</div>'}<h2>Trade with someone</h2>${o?`<div class="set"><select data-tp>${others.map(p=>`<option value="${esc(p.id)}" ${p.id===tr.to?"selected":""}>${esc(p.name)}</option>`).join("")}</select><b>You give</b>${rowsI(m.inv,"gi")+rowsC(m.cats,"gc")||"<small>You have nothing yet.</small>"}<b>You want from ${esc(o.name)}</b>${rowsI(o.inv,"wi")+rowsC(o.cats,"wc")||"<small>They have nothing yet.</small>"}<button data-offer>Send offer</button></div>`:'<div class="empty">Nobody else is here yet.</div>'}`;
+}
+$("#p-trade").onchange=$("#p-trade").oninput=e=>{
+ const d=e.target.dataset,v=e.target;
+ if(d.tp!==undefined){tr={to:v.value,gi:{},gc:[],wi:{},wc:[]};tsig="";renderTrade();return}
+ for(const k of["gi","wi"])if(d[k]!==undefined)tr[k][d[k]]=Math.max(0,parseInt(v.value)||0);
+ for(const k of["gc","wc"])if(d[k]!==undefined){const id=+d[k];tr[k]=v.checked?[...tr[k].filter(x=>x!==id),id]:tr[k].filter(x=>x!==id)}
+};
+$("#p-trade").onclick=async e=>{
+ const d=e.target.dataset,pick=o=>Object.fromEntries(Object.entries(o).filter(([,n])=>n>0));
+ try{
+  if("offer" in d){await api("trade/offer",{to:tr.to,give:{items:pick(tr.gi),cats:tr.gc},want:{items:pick(tr.wi),cats:tr.wc}});tr={to:tr.to,gi:{},gc:[],wi:{},wc:[]};tsig="";toast("Offer sent")}
+  else if(d.tacc){await api("trade/accept",{id:d.tacc});toast("Trade done")}
+  else if(d.tcan)await api("trade/cancel",{id:d.tcan});
+ }catch(x){}
+};
+
+// ---- cat battles
+const seen={};let sel={cat:"",to:""},sig="";
+function play(pid,a,fx){const f=document.querySelector(`.fi[data-pid="${pid}"]`);if(!f)return;const x=f.querySelector(".fx"),key=x._k=(x._k||0)+1;clearInterval(x._t);x.innerHTML="";x.className="fx";void f.offsetWidth;let dur=1000;
+ if(fx&&fx.t==="gif"){const i=new Image();i.src=fx.url;x.appendChild(i);dur=1800}
+ else if(fx&&fx.t==="frames"&&fx.urls.length){const i=new Image(),ms=fx.ms||120;let k=0;i.src=fx.urls[0];x.appendChild(i);x._t=setInterval(()=>{if(++k<fx.urls.length)i.src=fx.urls[k]},ms);dur=fx.urls.length*ms+150}
+ else x.className="fx "+a;
+ f.classList.add("hit");setTimeout(()=>{if(x._k!==key)return;clearInterval(x._t);x.innerHTML="";x.className="fx";f.classList.remove("hit")},dur)}
+const fighter=f=>`<div class="fi" data-pid="${esc(f.pid)}"><b>${esc(f.name)}’s ${esc(f.cat.name)}</b>${f.cat.img?`<img src="${esc(f.cat.img)}" alt="">`:'<div class="noimg">🐱</div>'}<div class="hp"><i style="width:${f.cat.max?Math.round(100*f.hp/f.cat.max):0}%"></i></div><small>${f.hp} / ${f.cat.max} HP</small>${f.team?`<div class="tm">${f.team.map((c,i)=>`<span class="${c.hp<=0?"dn":i===f.cur?"cu":""}" title="${esc(c.name)}">🐱</span>`).join("")}</div>`:""}<span class="fx"></span></div>`;
+function renderBattle(){
+ const box=$("#p-battle"),m=me();if(!m)return;
+ const b=m.battle,sg=JSON.stringify([b&&[b.id,b.state,b.n],Object.keys(cats),Object.keys(moves),m.moves,m.eq,m.cats,m.coins,Object.keys(players).length]);
+ if(sg===sig)return;sig=sg;
+ const catOpts=Object.values(cats).filter(c=>(m.cats||[]).includes(c.id)).map(c=>`<option value="${c.id}" ${String(c.id)===sel.cat?"selected":""}>${esc(c.name)} · ${c.hp} HP</option>`).join("");
+ let h="";
+ if(b&&b.state==="pending"){
+  h=b.a.pid===meId?`<div class="set"><b>Waiting for ${esc(b.b.name)} to accept…${b.bet?` Bet: ${b.bet} coins each.`:""}</b><button class="ghost" data-leave>Cancel challenge</button></div>`
+   :`<div class="set"><b>${esc(b.a.name)} challenges you with ${esc(b.a.cat.name)}!${b.bet?` Bet: ${b.bet} coins each.`:""}</b><select name="cat">${catOpts}</select><div class="row"><button data-acc="${b.id}">Accept</button><button class="ghost" data-leave>Decline</button></div></div>`;
+ }else if(b){
+  const turnMe=b.state==="active"&&b[b.turn].pid===meId,known=[{id:0,name:"Scratch",damage:10},...(m.eq||[]).map(id=>moves[id]).filter(Boolean)],sd=b.a.pid===meId?"a":"b",mine=b[sd],must=b.state==="active"&&b.need===sd,canGo=turnMe&&!b.need;
+  h=`<div class="row" style="align-items:flex-start;flex-wrap:nowrap">${fighter(b.a)}${fighter(b.b)}</div>
+  <div class="set"><b>${b.state==="done"?(b.winner===meId?"🎉 You won!"+(b.pot?` +${b.pot} coins`:""):"You lost this one."+(b.bet?` −${b.bet} coins`:"")):must?"Your cat fainted! Pick the next one":turnMe?"Your turn. Attack or swap cats":"Waiting for "+esc(b[b.turn].name)+"…"}</b>
+  ${b.state==="active"&&mine.team?`<div class="row">${mine.team.map((c,i)=>i!==mine.cur&&c.hp>0?`<button class="ghost" data-sw="${c.id}" ${turnMe||must?"":"disabled"}>Swap to ${esc(c.name)} (${c.hp} HP)</button>`:"").join("")}</div>`:""}
+   ${b.state==="active"&&!must?`<div class="row">${known.map(k=>`<button data-mv="${k.id}" ${canGo?"":"disabled"}>${esc(k.name)} · ${k.damage}</button>`).join("")}</div>`:""}
+  <small>${b.log.map(esc).join("<br>")}</small><button class="ghost" data-leave>${b.state==="done"?"Close":"Give up"}</button></div>`;
+ }else{
+  const others=Object.values(players).filter(p=>p.id!==meId&&!p.banned);
+  h=`<h2>Challenge a player</h2>${catOpts?`<div class="set"><select name="cat">${catOpts}</select><select name="to">${others.map(p=>`<option value="${esc(p.id)}" ${p.id===sel.to?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input name="bet" type="number" min="0" placeholder="Bet (coins)" style="width:7rem"><button data-ch>Challenge</button></div>`:'<div class="empty">You need a cat first. Get one in the Shop tab.</div>'}
+  <h2>Abilities for sale</h2>${Object.values(moves).map(k=>{const own=(m.moves||[]).includes(k.id),poor=!m.inf&&m.coins<k.price;return `<div class="card"><div class="i"><b>${esc(k.name)}</b><small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)}</small><span class="price">🪙 ${k.price}</span></div>${own?`<button class="ghost" data-eq="${k.id}">${(m.eq||[]).includes(k.id)?"Unequip":"Equip"}</button>`:`<button data-bm="${k.id}" ${poor?"disabled":""}>Buy</button>`}</div>`}).join("")||'<div class="empty">No abilities for sale yet.</div>'}
+  <small style="color:var(--mute)">Everyone starts with a free Scratch (10 damage). Only equipped abilities can be used in battle.</small>`;
+ }
+ box.innerHTML=h;
+ if(b){if(seen[b.id]===undefined)seen[b.id]=b.n;else if(b.n!==seen[b.id]){seen[b.id]=b.n;if(b.last){const t=b.last.by===b.a.pid?b.b.pid:b.a.pid;setTimeout(()=>play(t,b.last.anim,b.last.fx),30)}}}
+}
+$("#p-battle").onchange=e=>{const n=e.target.name;if(n==="cat"||n==="to")sel[n]=e.target.value};
+$("#p-battle").onclick=async e=>{
+ const d=e.target.dataset,v=n=>{const x=document.querySelector(`#p-battle [name=${n}]`);return x&&x.value};
+ try{
+  if("ch" in d)await api("battle/challenge",{to:v("to"),cat:v("cat"),bet:v("bet")});
+  else if(d.acc)await api("battle/accept",{id:d.acc,cat:v("cat")});
+  else if("leave" in d)await api("battle/leave");
+  else if(d.mv!==undefined)await api("battle/move",{id:me().battle.id,move:d.mv});
+  else if(d.sw)await api("battle/switch",{id:me().battle.id,cat:d.sw});
+   else if(d.eq){const on=!(me().eq||[]).includes(+d.eq);await api("move/equip",{id:d.eq,on})}
+   else if(d.bm){await api("move/buy",{id:d.bm});toast("Ability learned")}
+ }catch(x){}
+};
+</script>
+</body>
+</html>
