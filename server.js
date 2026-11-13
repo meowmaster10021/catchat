@@ -24,7 +24,7 @@ try{db.exec("ALTER TABLE moves ADD COLUMN fx TEXT DEFAULT ''")}catch(e){}
 try{db.exec("ALTER TABLE players ADD COLUMN eq TEXT DEFAULT NULL")}catch(e){}
 db.exec("CREATE TABLE IF NOT EXISTS badwords(w TEXT PRIMARY KEY)");
 db.exec("CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY AUTOINCREMENT,pid TEXT,text TEXT,ts INTEGER)");
-const MAX_SELL=5;
+const MAX_SELL=5,MAX_DMG=1e6,MAX_HP=MAX_DMG*10;
 const q=s=>db.prepare(s);
 
 // ---- persistence: the host's disk is wiped when the server sleeps, so the whole
@@ -201,7 +201,7 @@ const actions={
   const st=parseInt(b.stock);
   q("INSERT INTO items(name,emoji,descr,price,stock,kind,img) VALUES(?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),pr,st>0?st:-1,["physical","fun"].includes(b.kind)?b.kind:"normal",imgOk(b.img))},
  "cat/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the cat a name");
-  q("INSERT INTO cats(name,img,hp,price) VALUES(?,?,?,?)").run(n,imgOk(b.img),Math.min(9999,Math.max(1,parseInt(b.hp)||50)),Math.max(0,parseInt(b.price)||0))},
+  q("INSERT INTO cats(name,img,hp,price) VALUES(?,?,?,?)").run(n,imgOk(b.img),Math.min(MAX_HP,Math.max(1,parseInt(b.hp)||50)),Math.max(0,parseInt(b.price)||0))},
  "cat/buy"(p,b){const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.id));if(!c)bad("That cat is gone");
   const own=JSON.parse(p.cats||"[]");if(own.includes(c.id))bad("You already have that cat");
   if(!inf(p)&&p.coins<c.price)bad("Not enough coins");own.push(c.id);
@@ -209,7 +209,7 @@ const actions={
  "cat/remove"(p,b){adm(p);q("DELETE FROM cats WHERE id=?").run(parseInt(b.id))},
  "move/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the ability a name");
   const fx=b.fx?normFx(b.fx):"";if(b.fx&&!fx)bad("That animation is too big or invalid");
-  q("INSERT INTO moves(name,damage,anim,price,fx) VALUES(?,?,?,?,?)").run(n,Math.min(1e6,Math.max(1,parseInt(b.damage)||10)),ANIMS.includes(b.anim)?b.anim:"slash",Math.max(0,parseInt(b.price)||0),fx)},
+  q("INSERT INTO moves(name,damage,anim,price,fx) VALUES(?,?,?,?,?)").run(n,Math.min(MAX_DMG,Math.max(1,parseInt(b.damage)||10)),ANIMS.includes(b.anim)?b.anim:"slash",Math.max(0,parseInt(b.price)||0),fx)},
  "move/equip"(p,b){const id=parseInt(b.id);if(!owned(p).includes(id))bad("You don’t know that ability");
   let e=equipped(p);e=b.on?[...new Set([...e,id])]:e.filter(v=>v!==id);
   q("UPDATE players SET eq=? WHERE id=?").run(JSON.stringify(e),p.id)},
