@@ -245,6 +245,17 @@ const actions={
   if(!inf(p)&&p.coins<c.price)bad("Not enough coins");own.push(c.id);
   q("UPDATE players SET coins=coins-?,cats=? WHERE id=?").run(inf(p)?0:c.price,JSON.stringify(own),p.id);if(c.stock>0)q("UPDATE cats SET stock=stock-1 WHERE id=?").run(c.id)},
  "cat/remove"(p,b){adm(p);q("UPDATE cats SET listed=0 WHERE id=?").run(parseInt(b.id))},
+ "cat/sell"(p,b){const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.id)),own=JSON.parse(p.cats||"[]");
+  if(!c||!own.includes(c.id))bad("You don’t have that cat");if(inBattle(p.id))bad("Finish your battle first");
+  const got=Math.floor(c.price*0.7),m=ceqOf(p);delete m[c.id];
+  q("UPDATE players SET coins=coins+?,cats=?,ceq=? WHERE id=?").run(got,JSON.stringify(own.filter(i=>i!==c.id)),JSON.stringify(m),p.id);
+  if(c.stock>=0&&!c.packonly)q("UPDATE cats SET stock=stock+1 WHERE id=?").run(c.id)},
+ "move/sell"(p,b){const k=q("SELECT * FROM moves WHERE id=?").get(parseInt(b.id)),own=owned(p);
+  if(!k||!own.includes(k.id))bad("You don’t know that ability");if(inBattle(p.id))bad("Finish your battle first");
+  const got=Math.floor(k.price*0.7),m=ceqOf(p);for(const cid of Object.keys(m))if(Array.isArray(m[cid]))m[cid]=m[cid].filter(v=>v!==k.id);
+  const eq=p.eq==null?null:JSON.stringify(JSON.parse(p.eq).filter(v=>v!==k.id));
+  q("UPDATE players SET coins=coins+?,moves=?,eq=?,ceq=? WHERE id=?").run(got,JSON.stringify(own.filter(i=>i!==k.id)),eq,JSON.stringify(m),p.id);
+  if(k.stock>=0&&!k.packonly)q("UPDATE moves SET stock=stock+1 WHERE id=?").run(k.id)},
  "pack/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the pack a name");
   const price=Math.max(0,Math.min(1e6,parseInt(b.price)||0)),st=parseInt(b.stock),ch={},seen=new Set(),con=[],tiers=new Set();
   const pick=c=>{const t=c&&c.t,id=parseInt(c&&c.id);if(!Object.hasOwn(TB,t)||!(id>0))return null;const row=q(`SELECT * FROM ${TB[t]} WHERE id=?`).get(id);return row&&row.listed!==0&&!(t==="item"&&row.seller)?{t,id,row}:null};
