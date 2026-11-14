@@ -101,6 +101,8 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
 .rar{font-size:.72rem;border-radius:6px;padding:0 .4em;margin-left:.3em;color:#fff;text-transform:capitalize;white-space:nowrap}
 .r-common{background:#8a87ab}.r-uncommon{background:#1fa463}.r-rare{background:#2f7fd6}.r-epic{background:#8e5bd9}.r-legendary{background:#e8a400;color:#2b1d00}
 .tm{display:flex;justify-content:center;gap:2px;font-size:.8rem}.tm .dn{opacity:.25;filter:grayscale(1)}.tm .cu{outline:2px solid var(--accent);border-radius:50%}
+body[data-tab=games] #p-games{display:flex;flex-direction:column}
+#mkbody{display:grid;gap:.5rem}
 </style>
 </head>
 <body data-tab="chat" data-side="shop">
@@ -123,6 +125,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
   <section class="pane scroll" id="p-shop"></section>
   <section class="pane scroll" id="p-battle"></section>
   <section class="pane scroll" id="p-trade"></section>
+  <section class="pane scroll" id="p-games"></section>
   <section class="pane scroll" id="p-wallet"></section>
   <section class="pane scroll" id="p-settings"></section>
   <section class="pane scroll" id="p-admin"></section>
@@ -143,6 +146,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
  <div style="display:flex;justify-content:center;margin:.6rem 0"><img id="apv" class="apv" alt="" hidden></div>
  <div id="amsg" style="color:var(--danger);min-height:1.2em;font-size:.85rem"></div>
  <div class="row"><button type="button" class="ghost" data-apv>Preview</button><button type="button" class="ghost" data-aclose>Close</button><button type="button" data-ause>Use this</button></div></dialog>
+<dialog id="mkdlg" style="width:min(380px,94vw)"><div id="mkbody"></div><div class="row" style="margin-top:.6rem"><button type="button" class="ghost" data-mkx>Close</button><button type="button" data-mkgo>Create</button></div></dialog>
 <div id="pop"></div>
 <div id="toast"></div>
 
@@ -154,7 +158,7 @@ const odds=k=>{const ks=Object.keys(k.chances||{}).filter(r=>k.chances[r]>0),S=k
  if(!ks.length)return f?"Always "+esc(f.name):"Equal chance for every prize";
  return ks.map(r=>`${lab(r)} ${n(100*k.chances[r]/(f?100:S))}%`).join(" ")+(f&&S<100?` · ${esc(f.name)} ${n(100-S)}%`:"")};
 const rarSel=`<input name="rarity" list="rarlist" placeholder="Rarity (optional, type anything)" maxlength="20" autocomplete="off">`,poBox=`<label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="po" style="width:auto">Only in packs (not sold alone)</label>`;
-let meId=null,players={},items={},cats={},moves={},packs={},msgs=[],tab="chat",started=false;
+let meId=null,players={},items={},cats={},moves={},packs={},games={},gplay=0,msgs=[],tab="chat",started=false;
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const me=()=>players[meId], isAdmin=()=>!!(me()&&me().admin);
 const FUR=["#f2a65a","#8d8d9b","#2f2f3a","#f4efe6","#c98a5b","#e8c9a0","#7aa7c7","#d6a6e0"],EYE=["#4cc38a","#f5c542","#4aa3ff","#ff8a5c","#b07cff"],PAT=["plain","stripes","patch","muzzle"],ACC=["none","bow","crown","glasses","hat"];
@@ -214,7 +218,7 @@ function start(){
   players={};d.players.forEach(p=>players[p.id]=p);
   if(players[meId])Object.assign(players[meId],d.me);
   items={};d.items.forEach(i=>items[i.id]=i);
-  cats={};(d.cats||[]).forEach(c=>cats[c.id]=c);moves={};(d.moves||[]).forEach(k=>moves[k.id]=k);packs={};(d.packs||[]).forEach(k=>packs[k.id]=k);preload();
+  cats={};(d.cats||[]).forEach(c=>cats[c.id]=c);moves={};(d.moves||[]).forEach(k=>moves[k.id]=k);packs={};(d.packs||[]).forEach(k=>packs[k.id]=k);games={};(d.games||[]).forEach(g=>games[g.id]=g);preload();
   msgs=d.messages;renderAll();
  });
  es.addEventListener("bye",ev=>{logoutLocal();showLogin(ev.data==="banned"?"Your account was banned.":"Your account was deleted.")});
@@ -223,7 +227,7 @@ function start(){
 }
 function setTab(t){
  tab=t;document.body.dataset.tab=t;
- const tabs=[["chat","Chat"],["shop","Shop"],["battle","Battle"],["trade","Trade"],["wallet","Wallet"],["settings","Settings"]];if(isAdmin())tabs.push(["admin","Admin"]);
+ const tabs=[["chat","Chat"],["shop","Shop"],["battle","Battle"],["trade","Trade"],["games","phungamzhub"],["wallet","Wallet"],["settings","Settings"]];if(isAdmin())tabs.push(["admin","Admin"]);
  $("#nav").innerHTML=tabs.map(([k,l])=>`<button class="${t===k?"on":""}" data-t="${k}">${l}</button>`).join("");
 }
 $("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)setTab(t)};
@@ -234,7 +238,7 @@ function renderAll(){
  if(!me())return;
  $("#bal").textContent="🪙 "+(me().inf?"∞":me().coins);
  if(!isAdmin()&&tab==="admin")tab="shop";
- setTab(tab);renderPop();renderChat();renderShop();renderBattle();renderTrade();renderWallet();renderSettings();renderAdmin();
+ setTab(tab);renderPop();renderChat();renderShop();renderBattle();renderTrade();renderGames();renderWallet();renderSettings();renderAdmin();
 }
 function renderChat(){
  const l=$("#log"),stick=l.scrollHeight-l.scrollTop-l.clientHeight<80;
@@ -269,10 +273,10 @@ function renderShop(){
  const list=Object.entries(items).filter(([,i])=>i.listed&&!i.po&&!(i.seller&&i.stock===0));
  $("#shoplist").innerHTML=list.length?list.map(([id,i])=>{
   const out=i.stock===0,own=i.seller===meId,poor=m&&!m.inf&&m.coins<i.price,sp=i.seller&&players[i.seller];
-  return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}${rb2(i.rarity)}<small>${esc(i.desc||"")}${i.stock>0?` · ${i.stock} left`:""}</small>${i.seller?`<small>Sold by ${esc(sp?sp.name:"a cat")}</small>`:""}<span class="price">${i.price?"🪙 "+i.price:"Free"}</span></div>${own?`<button class="ghost" data-cancel="${id}">Cancel</button>`:`<button data-buy="${id}" ${out||poor?"disabled":""}>${out?"Sold out":i.price?"Buy":"Get"}</button>`}</div>`}).join(""):`<div class="empty">Nothing for sale yet. List the first item above!</div>`;
+  return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}${mkTag(i)}${rb2(i.rarity)}<small>${esc(i.desc||"")}${i.stock>0?` · ${i.stock} left`:""}</small>${i.seller?`<small>Sold by ${esc(sp?sp.name:"a cat")}</small>`:""}<span class="price">${i.price?"🪙 "+i.price:"Free"}</span></div>${own?`<button class="ghost" data-cancel="${id}">Cancel</button>`:`<button data-buy="${id}" ${out||poor?"disabled":""}>${out?"Sold out":i.price?"Buy":"Get"}</button>`}</div>`}).join(""):`<div class="empty">Nothing for sale yet. List the first item above!</div>`;
  $("#packlist").innerHTML=Object.values(packs).map(k=>{const out=k.stock===0,poor=!m.inf&&m.coins<k.price;return `<div class="card" style="flex-wrap:wrap"><div class="e">${esc(k.emoji||"🎁")}</div><div class="i"><b>${esc(k.name)}</b><small>${k.contents.length} possible prizes${k.stock>0?` · ${k.stock} left`:""}</small><small>${odds(k)}</small><span class="price">${k.price?"🪙 "+k.price:"Free"}</span></div><button data-bpack="${k.id}" ${out||poor?"disabled":""}>${out?"Sold out":"Open"}</button><details style="flex-basis:100%"><summary>What’s inside</summary>${k.contents.map(c=>`<small>${c.t==="cat"?"🐱 ":c.t==="move"?"⚔️ ":""}${esc(c.name)} ${rb(c.rarity)}${c.fill?" <i>(everything else)</i>":""}</small>`).join("")}</details></div>`}).join("")||'<div class="empty">No packs yet.</div>';
  const oc=m.cats||[];
- $("#catlist").innerHTML=Object.values(cats).filter(c=>c.listed&&!c.po).map(c=>{const has=oc.includes(c.id),poor=!m.inf&&m.coins<c.price;return `<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b>${rb2(c.rarity)}<small>${c.hp} HP${c.stock>0?` · ${c.stock} left`:""}</small><span class="price">${c.price?"🪙 "+c.price:"Free"}</span></div><button data-bcat="${c.id}" ${has||poor||c.stock===0?"disabled":""}>${has?"Owned":c.stock===0?"Sold out":c.price?"Buy":"Get"}</button></div>`}).join("")||'<div class="empty">No cats for sale yet.</div>';
+ $("#catlist").innerHTML=Object.values(cats).filter(c=>c.listed&&!c.owner&&!c.po).map(c=>{const has=oc.includes(c.id),poor=!m.inf&&m.coins<c.price;return `<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b>${rb2(c.rarity)}<small>${c.hp} HP${c.stock>0?` · ${c.stock} left`:""}</small><span class="price">${c.price?"🪙 "+c.price:"Free"}</span></div><button data-bcat="${c.id}" ${has||poor||c.stock===0?"disabled":""}>${has?"Owned":c.stock===0?"Sold out":c.price?"Buy":"Get"}</button></div>`}).join("")||'<div class="empty">No cats for sale yet.</div>';
 }
 $("#p-shop").oninput=e=>{if(e.target.name==="price"||e.target.name==="qty")renderShop()};
 $("#p-shop").onclick=async e=>{
@@ -300,9 +304,8 @@ function renderWallet(){
  const oc=(m.cats||[]).filter(id=>cats[id]),mv=(m.moves||[]).filter(id=>moves[id]),eqc=m.eqc||{};
  box.innerHTML=`<div class="set" style="text-align:center"><small style="color:var(--mute)">Your balance</small><div class="big-bal">🪙 ${m.inf?"∞":m.coins}</div><button data-daily ${left>0?"disabled":""}>${left>0?`Daily bonus in ${Math.ceil(left/36e5)}h`:"Claim 50 daily coins"}</button></div>
  <h2>Send coins</h2><form id="payf" class="set"><div class="row"><input name="to" list="plist" placeholder="Player name" required maxlength="16" autocomplete="off"><input name="amt" type="number" min="1" placeholder="Amount" required></div><datalist id="plist">${names.map(p=>`<option value="${esc(p.name)}">`).join("")}</datalist><button>Send</button></form>
- <h2>Your items</h2>${inv.length?inv.map(([id,n])=>{const i=items[id];return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}${rb2(i.rarity)}</div><b>×${n}</b>${i.kind==="fun"?`<button class="ghost" data-discard="${id}">Get rid of</button>`:(i.kind||"normal")==="normal"&&i.price>0?`<button class="ghost" data-sell="${id}">Sell 🪙${Math.floor(i.price*.7)}</button>`:""}</div>`}).join(""):'<div class="empty">Nothing yet. Visit the shop.</div>'}
- <h2>Your cats</h2>${oc.length?oc.map(id=>{const c=cats[id];return `<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b>${rb2(c.rarity)}<small>${c.hp} HP</small></div><button class="ghost" data-sellc="${id}">Sell 🪙${Math.floor(c.price*.7)}</button></div>`}).join(""):'<div class="empty">No cats yet. Get one in the Shop tab.</div>'}
- <h2>Your abilities</h2>${mv.length?(oc.length?mv.map(id=>{const k=moves[id];return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}<small>${k.damage} damage · equip on:</small></div><button class="ghost" data-sellm="${id}">Sell 🪙${Math.floor(k.price*.7)}</button><div class="row" style="flex-basis:100%">${oc.map(c=>{const on=(eqc[c]||[]).includes(id);return `<button class="${on?"":"ghost"}" data-eqm="${id}" data-eqc="${c}">${on?"✓ ":""}${esc(cats[c].name)}</button>`}).join("")}</div></div>`}).join(""):'<div class="empty">Get a cat first, then you can equip abilities on it.</div>'):'<div class="empty">No abilities yet. Buy some in the Battle tab. Scratch is always available.</div>'}
+ <h2>Your items</h2>${inv.length?inv.map(([id,n])=>{const i=items[id];return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}${mkTag(i)}${rb2(i.rarity)}</div><b>×${n}</b>${/maker$/.test(i.kind||"")?`<button data-usemk="${id}">Use</button>`:i.kind==="fun"?`<button class="ghost" data-discard="${id}">Get rid of</button>`:(i.kind||"normal")==="normal"&&i.price>0?`<button class="ghost" data-sell="${id}">Sell 🪙${Math.floor(i.price*.7)}</button>`:""}</div>`}).join(""):'<div class="empty">Nothing yet. Visit the shop.</div>'}
+ <h2>Your abilities</h2>${mv.length?(oc.length?mv.map(id=>{const k=moves[id];return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}<small>${k.damage} damage · equip on:</small></div><div class="row" style="flex-basis:100%">${oc.map(c=>{const on=(eqc[c]||[]).includes(id);return `<button class="${on?"":"ghost"}" data-eqm="${id}" data-eqc="${c}">${on?"✓ ":""}${esc(cats[c].name)}</button>`}).join("")}</div></div>`}).join(""):'<div class="empty">Get a cat first, then you can equip abilities on it.</div>'):'<div class="empty">No abilities yet. Buy some in the Battle tab. Scratch is always available.</div>'}
  <h2>Richest cats</h2>${top.map((p,i)=>`<div class="card">${avHTML(p)}<div class="i"><b>${i+1}. ${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}</div><span class="price">🪙 ${p.inf?"∞":p.coins}</span></div>`).join("")}`;
 }
 $("#p-wallet").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await pay(String(f.get("to")).trim(),parseInt(f.get("amt")));e.target.reset()}catch(x){}};
@@ -350,9 +353,8 @@ $("#p-wallet").onclick=async e=>{
  try{if("daily" in d){await api("daily");toast("+50 coins")}
  else if(d.sell){await api("sell",{id:d.sell});toast("Sold")}
  else if(d.discard)await api("discard",{id:d.discard});
- else if(d.eqm){const on=!((me().eqc||{})[d.eqc]||[]).includes(+d.eqm);await api("move/equip",{id:d.eqm,cat:d.eqc,on})}
- else if(d.sellc){const c=cats[d.sellc];if(c&&confirm(`Sell ${c.name} for ${Math.floor(c.price*.7)} coins?`)){await api("cat/sell",{id:d.sellc});toast("Cat sold")}}
- else if(d.sellm){const k=moves[d.sellm];if(k&&confirm(`Sell ${k.name} for ${Math.floor(k.price*.7)} coins?`)){await api("move/sell",{id:d.sellm});toast("Ability sold")}}}catch(x){}
+ else if(d.usemk)openMaker(d.usemk);
+ else if(d.eqm){const on=!((me().eqc||{})[d.eqc]||[]).includes(+d.eqm);await api("move/equip",{id:d.eqm,cat:d.eqc,on})}}catch(x){}
 };
 
 const animSel=`<select name="anim">${["slash","claw","fire","water","bolt","star"].map(a=>`<option>${a}</option>`).join("")}</select>`;
@@ -362,21 +364,21 @@ function renderAdmin(){
  const ps=Object.entries(players).sort((a,b)=>a[1].name.localeCompare(b[1].name)),R=meId===ROOT,blk=me().blocked||[];
  const keep=[...box.querySelectorAll("form [name]")].filter(i=>i.type!=="file").map(i=>[i.form.id,i.name,i.type==="checkbox"?i.checked:i.value]);
  const kpc=[...box.querySelectorAll("[data-pc]:checked")].map(x=>x.dataset.pc);
- const pcs=[...Object.values(items).filter(i=>i.listed&&!i.seller).map(i=>["item",i.id,(i.emoji||"🎁")+" "+i.name,i.rarity]),...Object.values(cats).filter(c=>c.listed).map(c=>["cat",c.id,"🐱 "+c.name,c.rarity]),...Object.values(moves).filter(k=>k.listed).map(k=>["move",k.id,"⚔️ "+k.name,k.rarity])].map(([t,id,l,r])=>`<label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" data-pc="${t}:${id}" style="width:auto">${esc(l)} ${rb(r)}</label>`).join("")||"<small>Create some items, cats or abilities first.</small>";
+ const pcs=[...Object.values(items).filter(i=>i.listed&&!i.seller).map(i=>["item",i.id,(i.emoji||"🎁")+" "+i.name,i.rarity]),...Object.values(cats).filter(c=>c.listed&&!c.owner).map(c=>["cat",c.id,"🐱 "+c.name,c.rarity]),...Object.values(moves).filter(k=>k.listed&&!k.owner).map(k=>["move",k.id,"⚔️ "+k.name,k.rarity])].map(([t,id,l,r])=>`<label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" data-pc="${t}:${id}" style="width:auto">${esc(l)} ${rb(r)}</label>`).join("")||"<small>Create some items, cats or abilities first.</small>";
  const kch=Object.fromEntries([...box.querySelectorAll("[data-ch]")].map(x=>[x.dataset.ch,x.value]));
- const lst=[...Object.values(items).filter(i=>i.listed&&!i.seller),...Object.values(cats).filter(c=>c.listed),...Object.values(moves).filter(k=>k.listed)];
+ const lst=[...Object.values(items).filter(i=>i.listed&&!i.seller),...Object.values(cats).filter(c=>c.listed&&!c.owner),...Object.values(moves).filter(k=>k.listed&&!k.owner)];
  const rnames=[...new Set(lst.map(x=>x.rarity||"~"))],rarl=[...new Set([...RAR,...rnames.filter(r=>r!=="~")])].map(r=>`<option value="${esc(r)}">`).join("");
- const fopts=[...Object.values(items).filter(i=>i.listed&&!i.seller).map(i=>["item",i.id,(i.emoji||"🎁")+" "+i.name]),...Object.values(cats).filter(c=>c.listed).map(c=>["cat",c.id,"🐱 "+c.name]),...Object.values(moves).filter(k=>k.listed).map(k=>["move",k.id,"⚔️ "+k.name])].map(([t,id,l])=>`<option value="${t}:${id}">${esc(l)}</option>`).join("");
+ const fopts=[...Object.values(items).filter(i=>i.listed&&!i.seller).map(i=>["item",i.id,(i.emoji||"🎁")+" "+i.name]),...Object.values(cats).filter(c=>c.listed&&!c.owner).map(c=>["cat",c.id,"🐱 "+c.name]),...Object.values(moves).filter(k=>k.listed&&!k.owner).map(k=>["move",k.id,"⚔️ "+k.name])].map(([t,id,l])=>`<option value="${t}:${id}">${esc(l)}</option>`).join("");
  box.innerHTML=`<datalist id="rarlist">${rarl}</datalist><h2>Add shop item</h2>
  <form id="af" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji (if no picture)" maxlength="4"><input name="name" placeholder="Item name" required maxlength="40"></div>${imgField("item")}
  <input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="0" placeholder="Price (0 = free)" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div>
- <select name="kind"><option value="normal">Normal item (can be sold back)</option><option value="fun">Fun item (can be thrown away)</option><option value="physical">Real item (a real prize)</option></select>${rarSel}${poBox}<button>Add item</button></form>
+ <select name="kind"><option value="normal">Normal item (can be sold back)</option><option value="fun">Fun item (can be thrown away)</option><option value="physical">Real item (a real prize)</option><option value="attackmaker">Attack maker (player creates an attack, then it is used up)</option><option value="catmaker">Cat maker (player creates a cat, then it is used up)</option></select><input name="cap" type="number" min="1" placeholder="Max damage / max HP (for makers only)">${rarSel}${poBox}<button>Add item</button></form>
  <h2>Items</h2>${Object.entries(items).filter(([,i])=>i.listed).map(([id,i])=>`<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${rb2(i.rarity)}<small>${i.price?"🪙 "+i.price:"Free"}${i.seller?" · player listing":""}${i.po?" · packs only":""}</small></div><button class="bad" data-rm="${id}">Remove</button></div>`).join("")||'<div class="empty">No items.</div>'}
  <h2>Create a cat</h2><form id="cf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Cat name" required maxlength="30"><input name="hp" type="number" min="1" max="10000000" placeholder="HP (like 50)" required><input name="price" type="number" min="0" placeholder="Price (0 = free)"><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div>${imgField("cat")}${rarSel}${poBox}<button>Create cat</button></form>
- ${Object.values(cats).filter(c=>c.listed).map(c=>`<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b>${rb2(c.rarity)}<small>${c.hp} HP · ${c.price?"🪙 "+c.price:"free"}${c.stock>=0?` · ${c.stock} left`:""}${c.po?" · packs only":""}</small></div><button class="bad" data-rmcat="${c.id}">Remove from shop</button></div>`).join("")}
+ ${Object.values(cats).filter(c=>c.listed&&!c.owner).map(c=>`<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b>${rb2(c.rarity)}<small>${c.hp} HP · ${c.price?"🪙 "+c.price:"free"}${c.stock>=0?` · ${c.stock} left`:""}${c.po?" · packs only":""}</small></div><button class="bad" data-rmcat="${c.id}">Remove from shop</button></div>`).join("")}
  <h2>Create an ability</h2><form id="mf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Ability name" required maxlength="30"><input name="damage" type="number" min="1" placeholder="Damage" required><input name="price" type="number" min="0" placeholder="Price (0 = free)" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div>
  <div class="row" style="align-items:center">${animSel}<button type="button" class="ghost" data-pvbtn>Preview animation</button><div class="fi" data-pid="__pv" style="flex:none;min-width:70px;width:70px"><div class="noimg" style="width:70px;height:70px;font-size:2rem">🐱</div><span class="fx"></span></div></div><div class="row"><button type="button" class="ghost" data-afxopen>Draw / upload animation…</button><button type="button" class="ghost" data-afxrm>Remove custom</button></div><small id="afxsum"></small>${rarSel}${poBox}<button>Create ability</button></form>
- ${Object.values(moves).filter(k=>k.listed).map(k=>`<div class="card"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}<small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)} · 🪙 ${k.price}${k.stock>=0?` · ${k.stock} left`:""}${k.po?" · packs only":""}</small></div><button class="bad" data-rmmove="${k.id}">Remove</button></div>`).join("")}
+ ${Object.values(moves).filter(k=>k.listed&&!k.owner).map(k=>`<div class="card"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}<small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)} · 🪙 ${k.price}${k.stock>=0?` · ${k.stock} left`:""}${k.po?" · packs only":""}</small></div><button class="bad" data-rmmove="${k.id}">Remove</button></div>`).join("")}
  <h2>Create a pack</h2><form id="pf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji" maxlength="4"><input name="name" placeholder="Pack name" required maxlength="30"></div><div class="row"><input name="price" type="number" min="0" placeholder="Price (0 = free)" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div><b>Chance of each rarity, in % (optional; blank = equal odds)</b><div class="row">${rnames.map(r=>`<label>${r==="~"?'<span class="rar r-common">no rarity</span>':rb(r)}<input data-ch="${esc(r)}" type="number" min="0" max="100" step="any" placeholder="%"></label>`).join("")}</div><label>Leftover chance goes to<select name="filler"><option value="">Nothing (scale the chances to 100%)</option>${fopts}</select></label><b>What can be inside</b>${pcs}<button>Create pack</button></form>
  ${Object.values(packs).map(k=>`<div class="card"><div class="e">${esc(k.emoji||"🎁")}</div><div class="i"><b>${esc(k.name)}</b><small>🪙 ${k.price} · ${k.contents.length} prizes${k.stock>=0?` · ${k.stock} left`:""}</small><small>${odds(k)}</small></div><button class="bad" data-rmpack="${k.id}">Remove</button></div>`).join("")}
  <h2>Players</h2>${ps.map(([id,p])=>{const self=id===ROOT;return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}<small>🪙 ${p.inf?"∞":p.coins}</small></div>${self?"":`<button class="ghost" data-adm="${id}">${p.admin?"Remove admin":"Make admin"}</button>`}${R&&!self?`<div class="row" style="flex-basis:100%"><input type="number" placeholder="Coins (− takes)" data-amt="${id}"><button data-give="${id}">Give</button><button class="bad" data-ban="${id}">Ban + delete</button></div>`:""}</div>`}).join("")}
@@ -391,7 +393,7 @@ function renderAdmin(){
 $("#p-admin").onsubmit=async e=>{
  e.preventDefault();if(!isAdmin())return;const f=new FormData(e.target),id=e.target.id;
  try{
-  if(id==="af"){await api("item/add",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),stock:f.get("stock"),kind:f.get("kind"),rarity:f.get("rarity"),po:!!f.get("po"),img:imgs.item});setImg("item","");toast("Item added")}
+  if(id==="af"){await api("item/add",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),stock:f.get("stock"),kind:f.get("kind"),cap:f.get("cap"),rarity:f.get("rarity"),po:!!f.get("po"),img:imgs.item});setImg("item","");toast("Item added")}
   else if(id==="pf"){const contents=[...e.target.querySelectorAll("[data-pc]:checked")].map(x=>{const[t,i]=x.dataset.pc.split(":");return{t,id:+i}}),chances={};e.target.querySelectorAll("[data-ch]").forEach(x=>{if(x.value!=="")chances[x.dataset.ch]=x.value});const fv=f.get("filler");await api("pack/add",{name:f.get("name"),emoji:f.get("emoji"),price:f.get("price"),stock:f.get("stock"),chances,contents,filler:fv?{t:fv.split(":")[0],id:+fv.split(":")[1]}:null});toast("Pack created")}
   else if(id==="wf"){await api("word/ban",{w:f.get("w")});toast("Word banned")}
   else if(id==="cf"){await api("cat/add",{name:f.get("name"),hp:f.get("hp"),price:f.get("price"),stock:f.get("stock"),rarity:f.get("rarity"),po:!!f.get("po"),img:imgs.cat});setImg("cat","");toast("Cat created")}
@@ -444,7 +446,7 @@ document.addEventListener("click",e=>{const k=e.target.dataset&&e.target.dataset
 // ---- custom attack animations (draw frames or upload a GIF)
 let afx=null,afr=[],agif="",amode="frames",apen="#000",aerase=false,apvT=0;const pre={};
 function preload(){for(const k of Object.values(moves)){if(!k.fx||pre[k.id])continue;pre[k.id]=1;(k.fx.urls||[k.fx.url]).forEach(u=>{new Image().src=u})}}
-function afxSummary(){const e=$("#afxsum");if(e)e.textContent=afx&&afx.t==="frames"?`Custom animation: ${afx.urls.length} frame(s)`:afx&&afx.t==="gif"?"Custom animation: GIF":"No custom animation, using the built-in one picked above."}
+function afxSummary(){const t=afx&&afx.t==="frames"?`Custom animation: ${afx.urls.length} frame(s)`:afx&&afx.t==="gif"?"Custom animation: GIF":"No custom animation, using the built-in one picked above.";for(const id of["#afxsum","#mkfxsum"]){const e=$(id);if(e)e.textContent=t}}
 const amsg=t=>{$("#amsg").textContent=t||""},ams=()=>Math.min(500,Math.max(50,parseInt($("#ams").value)||120));
 function renderA(){
  $("#a-frames").hidden=amode!=="frames";$("#a-gif").hidden=amode!=="gif";
@@ -556,7 +558,7 @@ function renderBattle(){
  }else{
   const others=Object.values(players).filter(p=>p.id!==meId&&!p.banned);
   h=`<h2>Challenge a player</h2>${catOpts?`<div class="set"><select name="cat">${catOpts}</select><select name="to">${others.map(p=>`<option value="${esc(p.id)}" ${p.id===sel.to?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input name="bet" type="number" min="0" placeholder="Bet (coins)" style="width:7rem"><button data-ch>Challenge</button></div>`:'<div class="empty">You need a cat first. Get one in the Shop tab.</div>'}
-  <h2>Abilities for sale</h2>${Object.values(moves).filter(k=>k.listed&&!k.po).map(k=>{const own=(m.moves||[]).includes(k.id),poor=!m.inf&&m.coins<k.price;return `<div class="card"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}<small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)}${k.stock>0?` · ${k.stock} left`:""}</small><span class="price">🪙 ${k.price}</span></div>${own?'<small>Owned · equip in Wallet</small>':`<button data-bm="${k.id}" ${poor||k.stock===0?"disabled":""}>${k.stock===0?"Sold out":"Buy"}</button>`}</div>`}).join("")||'<div class="empty">No abilities for sale yet.</div>'}
+  <h2>Abilities for sale</h2>${Object.values(moves).filter(k=>k.listed&&!k.owner&&!k.po).map(k=>{const own=(m.moves||[]).includes(k.id),poor=!m.inf&&m.coins<k.price;return `<div class="card"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}<small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)}${k.stock>0?` · ${k.stock} left`:""}</small><span class="price">🪙 ${k.price}</span></div>${own?'<small>Owned · equip in Wallet</small>':`<button data-bm="${k.id}" ${poor||k.stock===0?"disabled":""}>${k.stock===0?"Sold out":"Buy"}</button>`}</div>`}).join("")||'<div class="empty">No abilities for sale yet.</div>'}
   <small style="color:var(--mute)">Everyone starts with a free Scratch (10 damage). Equip abilities on each cat in the Wallet tab.</small>`;
  }
  box.innerHTML=h;
@@ -573,6 +575,46 @@ $("#p-battle").onclick=async e=>{
   else if(d.sw)await api("battle/switch",{id:me().battle.id,cat:d.sw});
   else if(d.bm){await api("move/buy",{id:d.bm});toast("Ability learned")}
  }catch(x){}
+};
+// ---- phungamzhub: games uploaded by admins, played in a sealed iframe
+let gsig="";
+function renderGames(){
+ const box=$("#p-games");if(!me())return;
+ if(gplay){if(games[gplay])return;gplay=0;gsig=""}
+ const adm=isAdmin(),sg=JSON.stringify([Object.values(games),adm]);
+ if(sg===gsig&&box.innerHTML)return;gsig=sg;
+ box.innerHTML=`<h2>phungamzhub 🎮</h2>`+(Object.values(games).map(g=>`<div class="card"><div class="e">🎮</div><div class="i"><b>${esc(g.name)}</b></div><button data-play="${g.id}">Play</button>${adm?`<button class="bad" data-gdel="${g.id}">Remove</button>`:""}</div>`).join("")||'<div class="empty">No games yet.</div>')
+  +(adm?`<h2>Upload a game</h2><form id="gf" class="card" style="display:grid;gap:.5rem"><input name="name" placeholder="Game name" required maxlength="40"><input name="file" type="file" accept=".html,.htm,text/html" required><small>One self-contained .html file, up to 300 KB. It runs in a sealed box: no outside links or saving.</small><button>Upload game</button></form>`:"");
+}
+$("#p-games").onclick=async e=>{const b=e.target.closest("button"),d=b&&b.dataset;if(!d)return;
+ try{
+  if(d.play){gplay=+d.play;gsig="";$("#p-games").innerHTML=`<div class="row" style="align-items:center;flex:none"><b style="flex:1">${esc(games[gplay].name)}</b><button class="ghost" data-gback style="flex:none">Back</button></div><iframe sandbox="allow-scripts" src="/game/${gplay}?t=${encodeURIComponent(token)}" style="flex:1;width:100%;min-height:360px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-top:.5rem"></iframe>`}
+  else if("gback" in d){gplay=0;gsig="";renderGames()}
+  else if(d.gdel){if(confirm("Remove this game?"))await api("game/remove",{id:d.gdel})}
+ }catch(x){}
+};
+$("#p-games").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),file=f.get("file");
+ if(!file||!file.size)return toast("Choose a game file");if(file.size>300000)return toast("That file is over 300 KB");
+ try{await api("game/add",{name:f.get("name"),html:await file.text()});toast("Game uploaded")}catch(x){}
+};
+
+// ---- makers: use one from the Wallet to create your own attack or cat (the maker is used up)
+const mkTag=i=>/maker$/.test(i.kind||"")?`<span class="tag">max ${i.cap} ${i.kind==="attackmaker"?"dmg":"HP"}</span>`:"";
+const afxData=()=>afx&&afx.t==="gif"?{t:"gif",g:afx.url}:afx&&afx.t==="frames"?{t:"frames",f:afx.urls,ms:afx.ms}:null;
+let mk=null;
+function openMaker(id){const i=items[id];if(!i)return;mk=i;const atk=i.kind==="attackmaker";
+ afx=null;afr=[];agif="";setImg("mkcat","");
+ $("#mkbody").innerHTML=`<b>${esc(i.name)}</b><small style="color:var(--mute)">${atk?"Make your own attack. Max damage "+i.cap+".":"Make your own cat. Max HP "+i.cap+"."} The maker is used up when you create.</small><input id="mkname" placeholder="${atk?"Attack name":"Cat name"}" maxlength="30"><input id="mknum" type="number" min="1" max="${i.cap}" placeholder="${atk?"Damage":"HP"} (1 to ${i.cap})">`
+  +(atk?`<select id="mkanim">${["slash","claw","fire","water","bolt","star"].map(a=>`<option>${a}</option>`).join("")}</select><button type="button" class="ghost" data-mkfx>Draw / upload animation…</button><small id="mkfxsum"></small>`:imgField("mkcat"));
+ afxSummary();$("#mkdlg").showModal()}
+$("#mkdlg").onclick=async e=>{const b=e.target.closest("button");if(!b||!mk)return;const d=b.dataset,atk=mk.kind==="attackmaker";
+ if("mkx" in d)return $("#mkdlg").close();
+ if("mkfx" in d){$("#adlg").showModal();renderA();return}
+ if("mkgo" in d){const name=$("#mkname").value.trim(),n=parseInt($("#mknum").value);
+  if(!name)return toast("Give it a name");if(!(n>=1)||n>mk.cap)return toast(`Enter a number from 1 to ${mk.cap}`);
+  try{if(atk)await api("maker/attack",{id:mk.id,name,damage:n,anim:$("#mkanim").value,fx:afxData()});else await api("maker/cat",{id:mk.id,name,hp:n,img:imgs.mkcat});
+   toast(atk?"Attack created! Equip it in your abilities":"Cat created! It’s in your collection");
+   afx=null;afr=[];agif="";setImg("mkcat","");$("#mkdlg").close();mk=null}catch(x){}}
 };
 </script>
 </body>
