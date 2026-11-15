@@ -306,8 +306,8 @@ function renderWallet(){
  <h2>Your items</h2>${inv.length?inv.map(([id,n])=>{const i=items[id];return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}${mkTag(i)}${rb2(i.rarity)}</div><b>×${n}</b>${/maker$/.test(i.kind||"")?`<button data-usemk="${id}">Use</button>`:i.kind==="fun"?`<button class="ghost" data-discard="${id}">Get rid of</button>`:(i.kind||"normal")==="normal"&&i.price>0?`<button class="ghost" data-sell="${id}">Sell 🪙${Math.floor(i.price*.7)}</button>`:""}</div>`}).join(""):'<div class="empty">Nothing yet. Visit the shop.</div>'}
  <h2>Your cats</h2>${oc.length?oc.map(id=>{const c=cats[id],pg=(m.lv||{})[id]||{lvl:1,into:0,need:40,hp:c.hp},ev=c.evo,can=ev&&pg.lvl>=ev.lvl;
   return `<div class="card" style="flex-wrap:wrap">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b><span class="tag">Lv ${pg.lvl}</span>${tbs(c.t)}<small>${pg.hp} HP · ${pg.need?`${pg.into}/${pg.need} XP`:"max level"}</small><div class="hp"><i style="width:${pg.need?Math.round(100*pg.into/pg.need):100}%"></i></div>${ev?`<small>Evolves at level ${ev.lvl}</small>`:""}</div>${can?`<div class="row" style="flex-basis:100%">${ev.to.filter(t=>cats[t]).map(t=>`<button data-evolve="${id}" data-evto="${t}">Evolve into ${esc(cats[t].name)}</button>`).join("")}</div>`:""}</div>`}).join(""):'<div class="empty">No cats yet. Get one in the Shop tab.</div>'}
- <h2>Your abilities</h2><div class="card"><div class="i"><b>Scratch</b>${tb("normal")}<small>10 damage · starter attack</small></div><button class="${m.scratch!==false?"":"ghost"}" data-eqm="0">${m.scratch!==false?"✓ Equipped":"Equip"}</button></div>
- ${mv.map(id=>{const k=moves[id],on=(m.eq||[]).includes(id);return `<div class="card"><div class="i"><b>${esc(k.name)}</b>${tb(k.type||"normal")}${rb2(k.rarity)}<small>${k.damage} damage</small></div><button class="${on?"":"ghost"}" data-eqm="${id}">${on?"✓ Equipped":"Equip"}</button></div>`}).join("")||'<div class="empty">No other abilities yet. Buy some in the Battle tab.</div>'}
+ <h2>Your abilities</h2>${oc.length?oc.map(c=>{const em=m.eqc||{},mine=em[c]||[0],where=id=>oc.find(x=>(em[x]||[]).includes(id));
+  return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(cats[c].name)}</b>${tbs(cats[c].t)}<small>Tap an attack to equip it on this cat. An attack fits on one cat at a time. Scratch fits on all.</small></div><div class="row" style="flex-basis:100%">${[0,...mv].map(id=>{const k=id?moves[id]:{name:"Scratch",type:"normal"},on=mine.includes(id),w=id&&!on?where(id):null;return `<button class="${on?"":"ghost"}" data-eqm="${id}" data-eqc="${c}" ${w?"disabled":""}>${on?"✓ ":""}${esc(k.name)} · ${esc(k.type||"normal")}${w?` (on ${esc(cats[w].name)})`:""}</button>`}).join("")}</div></div>`}).join(""):'<div class="empty">Get a cat first, then you can equip abilities on it.</div>'}
  <h2>Richest cats</h2>${top.map((p,i)=>`<div class="card">${avHTML(p)}<div class="i"><b>${i+1}. ${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}</div><span class="price">🪙 ${p.inf?"∞":p.coins}</span></div>`).join("")}`;
 }
 $("#p-wallet").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await pay(String(f.get("to")).trim(),parseInt(f.get("amt")));e.target.reset()}catch(x){}};
@@ -356,7 +356,7 @@ $("#p-wallet").onclick=async e=>{
  else if(d.sell){await api("sell",{id:d.sell});toast("Sold")}
  else if(d.discard)await api("discard",{id:d.discard});
  else if(d.usemk)openMaker(d.usemk);
- else if(d.eqm!==undefined){const id=+d.eqm,on=id===0?me().scratch===false:!(me().eq||[]).includes(id);await api("move/equip",{id,on})}
+ else if(d.eqm!==undefined){const id=+d.eqm,cat=+d.eqc,on=!((me().eqc||{})[cat]||[0]).includes(id);await api("move/equip",{id,cat,on})}
  else if(d.evolve){await api("cat/evolve",{id:d.evolve,to:d.evto});toast("Evolved! 🎉")}}catch(x){}
 };
 
@@ -556,7 +556,7 @@ function renderBattle(){
   h=b.a.pid===meId?`<div class="set"><b>Waiting for ${esc(b.b.name)} to accept…${b.bet?` Bet: ${b.bet} coins each.`:""}</b><button class="ghost" data-leave>Cancel challenge</button></div>`
    :`<div class="set"><b>${esc(b.a.name)} challenges you with ${esc(b.a.cat.name)}!${b.bet?` Bet: ${b.bet} coins each.`:""}</b><select name="cat">${catOpts}</select><div class="row"><button data-acc="${b.id}">Accept</button><button class="ghost" data-leave>Decline</button></div></div>`;
  }else if(b){
-  const sd=b.a.pid===meId?"a":"b",mine=b[sd],turnMe=b.state==="active"&&b[b.turn].pid===meId,known=[...(m.scratch!==false?[{id:0,name:"Scratch",damage:10,type:"normal"}]:[]),...((m.eqc||{})[mine.cat.id]||[]).map(id=>moves[id]).filter(Boolean)],must=b.state==="active"&&b.need===sd,canGo=turnMe&&!b.need;
+  const sd=b.a.pid===meId?"a":"b",mine=b[sd],turnMe=b.state==="active"&&b[b.turn].pid===meId,known=((m.eqc||{})[mine.cat.id]||[0]).map(id=>id===0?{id:0,name:"Scratch",damage:10,type:"normal"}:moves[id]).filter(Boolean),must=b.state==="active"&&b.need===sd,canGo=turnMe&&!b.need;
   h=`<div class="row" style="align-items:flex-start;flex-wrap:nowrap">${fighter(b.a)}${fighter(b.b)}</div>
   <div class="set"><b>${b.state==="done"?(b.winner===meId?"🎉 You won!"+(b.pot?` +${b.pot} coins`:""):"You lost this one."+(b.bet?` −${b.bet} coins`:"")):must?"Your cat fainted! Pick the next one":turnMe?"Your turn. Attack or swap cats":"Waiting for "+esc(b[b.turn].name)+"…"}</b>
   ${b.state==="active"&&mine.team?`<div class="row">${mine.team.map((c,i)=>i!==mine.cur&&c.hp>0?`<button class="ghost" data-sw="${c.id}" ${turnMe||must?"":"disabled"}>Swap to ${esc(c.name)} (${c.hp} HP)</button>`:"").join("")}</div>`:""}
@@ -618,9 +618,6 @@ $("#evdlg").onclick=async e=>{const b=e.target.closest("button");if(!b||!evc)ret
  }catch(x){}
 };
 document.addEventListener("click",e=>{const k=e.target.dataset&&e.target.dataset.clrimg;if(k){setImg(k,"");document.querySelectorAll(`[data-img="${k}"]`).forEach(x=>x.value="")}});
-</script>
-</body>
-</html>
 </script>
 </body>
 </html>
