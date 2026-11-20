@@ -27,6 +27,7 @@ db.exec("CREATE TABLE IF NOT EXISTS news(id INTEGER PRIMARY KEY AUTOINCREMENT,te
 db.exec("CREATE TABLE IF NOT EXISTS nimgs(id INTEGER PRIMARY KEY AUTOINCREMENT,nid INTEGER,img TEXT)");
 try{db.exec("ALTER TABLE news ADD COLUMN title TEXT DEFAULT ''")}catch(e){}
 try{db.exec("ALTER TABLE news ADD COLUMN body TEXT DEFAULT ''")}catch(e){}
+try{db.exec("ALTER TABLE news ADD COLUMN author TEXT DEFAULT ''")}catch(e){}
 try{db.exec("ALTER TABLE messages ADD COLUMN img TEXT DEFAULT ''")}catch(e){}
 try{db.exec("ALTER TABLE moves ADD COLUMN st TEXT DEFAULT ''")}catch(e){}
 try{db.exec("ALTER TABLE moves ADD COLUMN sc INTEGER DEFAULT 0")}catch(e){}
@@ -104,7 +105,7 @@ const hasBad=name=>{const n=norm(name);return q("SELECT w FROM badwords").all().
 const fails=new Map();
 const blocked=k=>(fails.get(k)||[]).filter(t=>Date.now()-t<6e5).length>=8;
 const strike=k=>fails.set(k,[...(fails.get(k)||[]).filter(t=>Date.now()-t<6e5),Date.now()]);
-const lastMsg=new Map();
+const lastMsg=new Map(),lastNews=new Map();
 
 function login(b,ip){
  const name=String(b.name||"").trim(),pw=String(b.pw||""),id=name.toLowerCase();
@@ -167,7 +168,7 @@ const refund=x=>{if(x.state==="active"&&x.bet&&!x.paid){x.paid=1;for(const s of[
 const battles=new Map();let bid=0;const trades=new Map();let tid=0;
 const inBattle=id=>[...battles.values()].find(x=>x.a.pid===id||x.b.pid===id);
 const ft=(pl,c)=>({pid:pl.id,name:pl.name,cat:{id:c.id,name:c.name,img:c.img?`/img/cat/${c.id}?v=${iv(c.img)}`:"",max:c.hp,t:[c.t1||"normal",c.t2||""].filter(Boolean)},hp:c.hp});
-const wipe=id=>{q("DELETE FROM notes WHERE pid=?").run(id);q("DELETE FROM items WHERE seller=? AND stock!=0").run(id);q("DELETE FROM sessions WHERE pid=?").run(id);
+const wipe=id=>{q("DELETE FROM notes WHERE pid=?").run(id);for(const n of q("SELECT id FROM news WHERE author=?").all(id)){q("DELETE FROM news WHERE id=?").run(n.id);q("DELETE FROM nimgs WHERE nid=?").run(n.id)}q("DELETE FROM items WHERE seller=? AND stock!=0").run(id);q("DELETE FROM sessions WHERE pid=?").run(id);
  for(const[k,x]of battles)if(x.a.pid===id||x.b.pid===id){refund(x);battles.delete(k)}
  for(const[k,x]of trades)if(x.from===id||x.to===id)trades.delete(k);
  const re=new RegExp("(^|[^A-Za-z0-9_])"+id+"($|[^A-Za-z0-9_])","i");
@@ -397,8 +398,9 @@ const actions={
   own[own.indexOf(c.id)]=t.id;cxs[t.id]=cxs[c.id]||0;delete cxs[c.id];
   q("UPDATE players SET cats=?,cx=?,eqc=? WHERE id=?").run(JSON.stringify(own),JSON.stringify(cxs),JSON.stringify(em),p.id);post(p.name,`${c.name} evolved into ${t.name}`)},
  // news: the owner builds a page out of blocks (heading, text, picture, link, line)
- "news/post"(p,b){root(p);
-  const title=String(b.title||"").trim().slice(0,100),raw=Array.isArray(b.blocks)?b.blocks.slice(0,40):[],
+ "news/post"(p,b){if(!p.admin&&Date.now()-(lastNews.get(p.id)||0)<30000)bad("Wait half a minute before posting again");
+  const maxImg=p.admin?6:3;
+  const title=String(b.title||"").trim().slice(0,100),raw=Array.isArray(b.blocks)?b.blocks.slice(0,p.admin?40:25):[],
    col=v=>/^#[0-9a-fA-F]{6}$/.test(v)?v:"",al=v=>["left","center","right"].includes(v)?v:"left",out=[],ins=[];
   for(const k of raw){if(!k||typeof k!=="object")continue;
    if(k.t==="h"||k.t==="p"){const x=String(k.x||"").slice(0,3000);if(!x.trim())continue;
@@ -406,13 +408,16 @@ const actions={
    else if(k.t==="a"){const u=String(k.u||"").trim().slice(0,300),x=String(k.x||"").trim().slice(0,80)||u;
     if(!/^https?:\/\/[^\s"'<>]+$/i.test(u))bad("Links must start with http:// or https://");out.push({t:"a",x,u,a:al(k.a)})}
    else if(k.t==="hr")out.push({t:"hr"});
-   else if(k.t==="img"){const im=imgOk(k.u,150000);if(!im)bad("A picture is too big");if(ins.length>=6)bad("At most 6 pictures per page");out.push({t:"img",a:al(k.a),k:ins.length});ins.push(im)}}
+   else if(k.t==="img"){const im=imgOk(k.u,150000);if(!im)bad("A picture is too big");if(ins.length>=maxImg)bad(`At most ${maxImg} pictures per page`);out.push({t:"img",a:al(k.a),k:ins.length});ins.push(im)}}
   if(!title&&!out.length)bad("Add a title or some content to the page");
-  const id=Number(q("INSERT INTO news(title,body,ts) VALUES(?,?,?)").run(title,"",Date.now()).lastInsertRowid);
+  const id=Number(q("INSERT INTO news(title,body,ts,author) VALUES(?,?,?,?)").run(title,"",Date.now(),p.id).lastInsertRowid);
   const ids=ins.map(im=>Number(q("INSERT INTO nimgs(nid,img) VALUES(?,?)").run(id,im).lastInsertRowid));
   for(const o of out)if(o.t==="img")o.k=ids[o.k];
-  q("UPDATE news SET body=? WHERE id=?").run(JSON.stringify(out),id)},
- "news/delete"(p,b){root(p);const id=parseInt(b.id);q("DELETE FROM news WHERE id=?").run(id);q("DELETE FROM nimgs WHERE nid=?").run(id)},
+  q("UPDATE news SET body=? WHERE id=?").run(JSON.stringify(out),id);
+  lastNews.set(p.id,Date.now());
+  // keep only the newest 60 posts so the backup stays small
+  for(const o of q("SELECT id FROM news ORDER BY id DESC LIMIT -1 OFFSET 60").all()){q("DELETE FROM news WHERE id=?").run(o.id);q("DELETE FROM nimgs WHERE nid=?").run(o.id)}},
+ "news/delete"(p,b){const id=parseInt(b.id),n=q("SELECT author FROM news WHERE id=?").get(id);if(!n)bad("That post is gone");if(!p.admin&&n.author!==p.id)bad("You can only delete your own posts");q("DELETE FROM news WHERE id=?").run(id);q("DELETE FROM nimgs WHERE nid=?").run(id)},
  "pack/add"(p,b){adm(p);const name=String(b.name||"").trim().slice(0,30);if(!name)bad("Give the pack a name");
   const price=parseInt(b.price);if(!(price>=0&&price<=1e6))bad("Enter a price (0 for a free pack)");const st=parseInt(b.stock);
   const valid=c=>c&&typeof c==="object"&&Object.hasOwn(PK,c.t)&&q(`SELECT 1 FROM ${PK[c.t]} WHERE id=?`).get(parseInt(c.id));
@@ -479,7 +484,7 @@ const snapshot=()=>{const on=new Set([...clients].map(c=>c.pid));return JSON.str
  moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,owner:k.owner||"",rarity:k.rarity||"",type:k.type||"normal",st:k.st||"",sc:k.sc||0,po:!!k.po,listed:!k.hidden,fx:fxInfo(k)})),
  packs:snapPacks(),
  messages:q("SELECT * FROM (SELECT id,name,text,ts,sys,img!='' AS hasimg FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all(),
- news:q("SELECT id,title,body,text,ts,img!='' AS hi FROM news ORDER BY id DESC LIMIT 30").all()})};
+ news:q("SELECT id,title,body,text,ts,author,img!='' AS hi FROM news ORDER BY id DESC LIMIT 30").all()})};
 function sendTo(c,base){const m=find(c.pid);if(!m)return;const cxm=JSON.parse(m.cx||"{}");
  c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),daily:m.daily,moves:JSON.parse(m.moves||"[]"),eq:equipped(m),scratch:!m.noscratch,lv:Object.fromEntries(JSON.parse(m.cats||"[]").map(id=>{const c=q("SELECT hp FROM cats WHERE id=?").get(id),pg=prog(cxm[id]||0);return[id,{...pg,hp:c?hpAt(c.hp,pg.lvl):0}]})),eqc:eqMap(m),battle:inBattle(m.id)||null,trades:[...trades.values()].filter(x=>x.from===m.id||x.to===m.id).map(({id,from,to,give,want})=>({id,from,to,give,want})),blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined,notes:q("SELECT id,text FROM notes WHERE pid=? ORDER BY id").all(m.id),words:m.admin?q("SELECT w FROM badwords ORDER BY w").all().map(r=>r.w):undefined})+"}\n\n")}
 function broadcast(){if(!clients.size)return;const base=snapshot();for(const c of clients)sendTo(c,base)}
@@ -522,7 +527,7 @@ http.createServer(async(req,res)=>{
    const act=url.pathname.slice(5);
    if(act==="login"){const b=await readBody(req),ip=req.headers["fly-client-ip"]||req.socket.remoteAddress;const r=login(b,ip);push();return J(res,200,r)}
    const p=auth(req,url);if(!p)return J(res,401,{error:"auth"});
-   const b=await readBody(req,act==="news/post"&&p.id===ROOT?1.5e6:200e3);
+   const b=await readBody(req,act==="news/post"?(p.admin?1.5e6:700e3):200e3);
    if(act==="logout"){q("DELETE FROM sessions WHERE token=?").run((req.headers.authorization||"").replace(/^Bearer /,""));scheduleSave();return J(res,200,{ok:1})}
    if(!Object.hasOwn(actions,act))return J(res,404,{error:"Unknown action"});
    const r=tx(()=>actions[act](p,b));push();
@@ -533,6 +538,10 @@ http.createServer(async(req,res)=>{
  }catch(e){
   if(e instanceof E)return J(res,400,{error:e.message});
   console.error(e);J(res,500,{error:"Server error"});
+ }
+}).listen(PORT,"0.0.0.0",()=>console.log("CatChat listening on "+PORT));
+scheduleSave();
+})().catch(e=>{console.error(e);process.exit(1)});
  }
 }).listen(PORT,"0.0.0.0",()=>console.log("CatChat listening on "+PORT));
 scheduleSave();
