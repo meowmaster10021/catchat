@@ -51,7 +51,7 @@ h2{margin:.2rem 0;font-size:1.05rem}
 #toast{position:fixed;left:50%;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.5em 1em;border-radius:10px;display:none;z-index:9}
 .tag{font-size:.75rem;background:var(--coin);color:#2b1d00;border-radius:6px;padding:0 .4em;margin-left:.3em}
 body[data-tab=chat] #p-chat{display:flex;flex-direction:column}
-body[data-tab=shop] #p-shop,body[data-tab=wallet] #p-wallet,body[data-tab=settings] #p-settings,body[data-tab=admin] #p-admin,body[data-tab=apps][data-app=home] #p-home,body[data-tab=apps][data-app=arcade] #p-arcade,body[data-tab=apps][data-app=news] #p-news,body[data-tab=apps][data-app=battle] #p-battle,body[data-tab=apps][data-app=trade] #p-trade{display:grid}
+body[data-tab=shop] #p-shop,body[data-tab=battle] #p-battle,body[data-tab=trade] #p-trade,body[data-tab=wallet] #p-wallet,body[data-tab=settings] #p-settings,body[data-tab=admin] #p-admin{display:grid}
 .mw{display:flex;gap:.5rem;align-items:flex-end;max-width:92%}
 .mw.me{align-self:flex-end;flex-direction:row-reverse}
 .av{width:36px;height:36px;border-radius:50%;flex:none;background:var(--line);object-fit:cover;overflow:visible}
@@ -102,49 +102,9 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
 .r-common{background:#8a87ab}.r-uncommon{background:#1fa463}.r-rare{background:#2f7fd6}.r-epic{background:#8e5bd9}.r-legendary{background:#e8a400;color:#2b1d00}
 .tm{display:flex;justify-content:center;gap:2px;font-size:.8rem}.tm .dn{opacity:.25;filter:grayscale(1)}.tm .cu{outline:2px solid var(--accent);border-radius:50%}
 #mkbody{display:grid;gap:.5rem}
-nav[hidden]{display:none}
-#subnav{background:var(--bg)}
-#p-chat{position:relative}
-#p-chat.drag{outline:3px dashed var(--accent);outline-offset:-6px}
-#p-chat.drag::after{content:"Drop a picture to send it 🐾";position:absolute;inset:0;display:grid;place-items:center;font-weight:600;background:color-mix(in srgb,var(--bg) 75%,transparent);pointer-events:none}
-.mi{display:block;max-width:min(260px,100%);max-height:260px;border-radius:10px;margin-top:.3rem;background:var(--line)}
-#pend{display:flex;gap:.5rem;align-items:center;padding:.5rem 1rem 0}
-#pend[hidden]{display:none}
-#pend img{width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
-.clip{display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;padding:0 .7em;cursor:pointer;background:var(--panel)}
-.news{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:.9rem;display:grid;gap:.6rem}
-.news .nt{white-space:pre-wrap;overflow-wrap:anywhere}
-.news .nimg{max-width:100%;max-height:420px;border-radius:10px;object-fit:contain;display:inline-block}
-.news .nd{color:var(--mute);font-size:.85rem;display:flex;gap:.6rem;align-items:center}
-.news .nd span{flex:1}
-#nf.drag{outline:3px dashed var(--accent)}
-textarea{resize:vertical}
-.bh{margin:0;font-size:1.3rem}
-.bp{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
-.bl{display:inline-block;padding:.5em .9em;border-radius:10px;background:var(--accent);color:#07241b;font-weight:600;text-decoration:none}
-.news hr,.blk hr{border:0;border-top:1px solid var(--line);width:100%;margin:.2rem 0}
-.blk{border:1px solid var(--line);border-radius:12px;padding:.6rem;display:grid;gap:.5rem;background:var(--bg)}
-.blk input[type=color]{padding:0;height:36px;min-width:44px;flex:none}
-.fi.st-poison>img,.fi.st-poison>.noimg{filter:hue-rotate(250deg) saturate(1.5)}
-.fi.st-burn>img,.fi.st-burn>.noimg{box-shadow:0 0 18px 4px #ff7a2c}
-.fi.st-freeze>img,.fi.st-freeze>.noimg{filter:hue-rotate(160deg) brightness(1.15);box-shadow:0 0 14px 3px #8fe3ff}
-.fi.st-sleep>img,.fi.st-sleep>.noimg{filter:brightness(.6) grayscale(.4)}
-.fi.st-paralysis>img,.fi.st-paralysis>.noimg{box-shadow:0 0 16px 3px #ffd93c}
-.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:.8rem}
-.tile{aspect-ratio:1;display:grid;place-content:center;justify-items:center;gap:.2rem;padding:.4rem;border-radius:22px;background:var(--panel);color:var(--ink);border:1px solid var(--line);position:relative}
-.tile span{font-size:2.6rem;line-height:1}
-.tile small{font-weight:600}
-.tile .bdg{position:absolute;top:8px;right:8px;background:var(--danger);color:#fff;border-radius:999px;min-width:20px;height:20px;font-size:.75rem;display:grid;place-items:center;padding:0 5px;font-style:normal}
-.pad{display:grid;grid-template-columns:repeat(3,64px);gap:.4rem;justify-content:center;margin-top:.2rem}
-.pad button{height:56px;font-size:1.3rem;touch-action:manipulation}
-.ttt{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;width:min(100%,300px)}
-.ttt button{aspect-ratio:1;font-size:2.4rem;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
-.cb{display:grid;grid-template-columns:repeat(8,1fr);width:min(100%,400px);border:2px solid var(--line);border-radius:6px;overflow:hidden}
-.cb button{aspect-ratio:1;padding:0;border-radius:0;display:grid;place-items:center;font-size:min(8vw,2.3rem);position:relative}
-.cb .dt{position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(15,157,115,.65)}
 </style>
 </head>
-<body data-tab="chat" data-app="home" data-side="shop">
+<body data-tab="chat" data-side="shop">
 <div id="login"><form id="lf">
  <h1>CatChat 🐾</h1>
  <p>Pick a name to chat, earn coins and shop. Your name stays yours.</p>
@@ -158,15 +118,10 @@ textarea{resize:vertical}
 <div id="app">
  <header><b>CatChat 🐾</b><span class="coins" id="bal"></span><button class="ghost" id="out">Leave</button></header>
  <nav id="nav"></nav>
- <nav id="subnav" hidden></nav>
  <main>
   <section class="pane" id="p-chat"><div id="log"></div>
-   <div id="pend" hidden><img id="pendimg" alt=""><button type="button" class="ghost" id="pendx">Remove picture</button></div>
-   <form id="send"><label class="clip" title="Add a picture">📎<input type="file" id="mf" accept="image/*" hidden></label><input id="msg" placeholder="Message, /pay name 25, or drop a picture" autocomplete="off" maxlength="300"><button>Send</button></form></section>
+   <form id="send"><input id="msg" placeholder="Message, or /pay name 25" autocomplete="off" maxlength="300"><button>Send</button></form></section>
   <section class="pane scroll" id="p-shop"></section>
-  <section class="pane scroll" id="p-home"></section>
-  <section class="pane scroll" id="p-news"></section>
-  <section class="pane scroll" id="p-arcade"></section>
   <section class="pane scroll" id="p-battle"></section>
   <section class="pane scroll" id="p-trade"></section>
   <section class="pane scroll" id="p-wallet"></section>
@@ -201,9 +156,8 @@ const RAR=["common","uncommon","rare","epic","legendary"],CLS=new Set(RAR),rb=r=
 const odds=k=>{const ks=Object.keys(k.chances||{}).filter(r=>k.chances[r]>0),S=ks.reduce((s,r)=>s+k.chances[r],0),f=k.contents.find(c=>c.fill),lab=r=>r==="~"?'<span class="rar r-common">no rarity</span>':rb(r),n=v=>Math.round(v*10)/10;
  if(!ks.length)return f?"Always "+esc(f.name):"Equal chance for every prize";
  return ks.map(r=>`${lab(r)} ${n(100*k.chances[r]/(f?100:S))}%`).join(" ")+(f&&S<100?` · ${esc(f.name)} ${n(100-S)}%`:"")};
-const giveBox=`<label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="give" style="width:auto">Give me one right away</label>`;
 const rarSel=`<input name="rarity" list="rarlist" placeholder="Rarity (optional, type anything)" maxlength="20" autocomplete="off">`,poBox=`<label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="po" style="width:auto">Only in packs (not sold alone)</label>`;
-let meId=null,players={},items={},cats={},moves={},packs={},msgs=[],news=[],wilds={},trainers={},tab="chat",app="home",started=false;
+let meId=null,players={},items={},cats={},moves={},packs={},msgs=[],tab="chat",started=false;
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const me=()=>players[meId], isAdmin=()=>!!(me()&&me().admin);
 const FUR=["#f2a65a","#8d8d9b","#2f2f3a","#f4efe6","#c98a5b","#e8c9a0","#7aa7c7","#d6a6e0"],EYE=["#4cc38a","#f5c542","#4aa3ff","#ff8a5c","#b07cff"],PAT=["plain","stripes","patch","muzzle"],ACC=["none","bow","crown","glasses","hat"];
@@ -263,24 +217,19 @@ function start(){
   players={};d.players.forEach(p=>players[p.id]=p);
   if(players[meId])Object.assign(players[meId],d.me);
   items={};d.items.forEach(i=>items[i.id]=i);
-  cats={};(d.cats||[]).forEach(c=>cats[c.id]=c);moves={};(d.moves||[]).forEach(k=>moves[k.id]=k);packs={};(d.packs||[]).forEach(k=>packs[k.id]=k);wilds={};(d.wilds||[]).forEach(w=>wilds[w.id]=w);trainers={};(d.trainers||[]).forEach(t=>trainers[t.id]=t);preload();
-  msgs=d.messages;news=d.news||[];renderAll();
+  cats={};(d.cats||[]).forEach(c=>cats[c.id]=c);moves={};(d.moves||[]).forEach(k=>moves[k.id]=k);packs={};(d.packs||[]).forEach(k=>packs[k.id]=k);preload();
+  msgs=d.messages;renderAll();
  });
  es.addEventListener("bye",ev=>{logoutLocal();showLogin(ev.data==="banned"?"Your account was banned.":"Your account was deleted.")});
  es.onerror=()=>{if(es&&es.readyState===2){logoutLocal();showLogin("Session expired. Log in again.")}};
  setTab("chat");
 }
-function setTab(t,a){
- if(a)app=a;tab=t;document.body.dataset.tab=t;document.body.dataset.app=app;
- const tabs=[["chat","Chat"],["shop","Shop"],["apps","Apps"],["wallet","Wallet"],["settings","Settings"]];if(isAdmin())tabs.push(["admin","Admin"]);
+function setTab(t){
+ tab=t;document.body.dataset.tab=t;
+ const tabs=[["chat","Chat"],["shop","Shop"],["battle","Battle"],["trade","Trade"],["wallet","Wallet"],["settings","Settings"]];if(isAdmin())tabs.push(["admin","Admin"]);
  $("#nav").innerHTML=tabs.map(([k,l])=>`<button class="${t===k?"on":""}" data-t="${k}">${l}</button>`).join("");
- const inApp=t==="apps"&&app!=="home",sn=$("#subnav"),cur=APPS.find(x=>x[0]===app);
- sn.hidden=!inApp;
- sn.innerHTML=inApp?`<button data-a="home">← Apps</button><b style="align-self:center">${cur?cur[1]+" "+esc(cur[2]):""}</b>`:"";
- if(!(t==="apps"&&app==="arcade")&&gstop){stopGame();arcadeMenu()}
 }
-$("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)t==="apps"?setTab("apps","home"):setTab(t)};
-$("#subnav").onclick=e=>{const a=e.target.dataset.a;if(a)setTab("apps",a)};
+$("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)setTab(t)};
 addEventListener("resize",()=>meId&&setTab(tab));
 
 function renderAll(){
@@ -288,51 +237,26 @@ function renderAll(){
  if(!me())return;
  $("#bal").textContent="🪙 "+(me().inf?"∞":me().coins);
  if(!isAdmin()&&tab==="admin")tab="shop";
- setTab(tab);renderPop();renderChat();renderHome();renderNews();renderShop();renderBattle();renderTrade();renderWallet();renderSettings();renderAdmin();
+ setTab(tab);renderPop();renderChat();renderShop();renderBattle();renderTrade();renderWallet();renderSettings();renderAdmin();
 }
 function renderChat(){
  const l=$("#log"),stick=l.scrollHeight-l.scrollTop-l.clientHeight<80;
  l.innerHTML=msgs.map(m=>{
   if(m.sys)return `<div class="sys">${esc(m.text)}</div>`;
   const mine=m.name&&m.name.toLowerCase()===meId, p=players[(m.name||"").toLowerCase()];
-  return `<div class="mw ${mine?"me":""}">${avHTML(p||{name:m.name||"?"})}<div class="m ${mine?"me":""}"><div class="n">${esc(m.name)}${p&&p.admin?'<span class="tag">admin</span>':""}${isAdmin()?`<button class="x" data-del="${m.id}" title="Delete message">✕</button>`:""}</div>${esc(m.text)}${m.hasimg?`<a href="/img/msg/${m.id}" target="_blank" rel="noopener"><img class="mi" src="/img/msg/${m.id}" alt="Picture"></a>`:""}</div></div>`}).join("")||'<div class="empty">No messages yet. Say hi.</div>';
- if(stick){l.scrollTop=l.scrollHeight;l.querySelectorAll("img.mi").forEach(i=>{if(!i.complete)i.addEventListener("load",()=>{l.scrollTop=l.scrollHeight},{once:true})})}
+  return `<div class="mw ${mine?"me":""}">${avHTML(p||{name:m.name||"?"})}<div class="m ${mine?"me":""}"><div class="n">${esc(m.name)}${p&&p.admin?'<span class="tag">admin</span>':""}${isAdmin()?`<button class="x" data-del="${m.id}" title="Delete message">✕</button>`:""}</div>${esc(m.text)}</div></div>`}).join("")||'<div class="empty">No messages yet. Say hi.</div>';
+ if(stick)l.scrollTop=l.scrollHeight;
 }
 $("#log").onclick=async e=>{const id=e.target.dataset.del;if(id&&isAdmin())try{await api("admin/delmsg",{id})}catch(x){}};
 $("#send").onsubmit=async e=>{
- e.preventDefault();const t=$("#msg").value.trim();if((!t&&!pimg)||!me())return;
+ e.preventDefault();const t=$("#msg").value.trim();if(!t||!me())return;$("#msg").value="";
  try{
-  if(!pimg){const c=t.match(/^\/pay\s+(\S+)\s+(\d+)$/i);
-   if(c){$("#msg").value="";return await pay(c[1],+c[2])}
-   if(t[0]==="/"){$("#msg").value="";return toast("Try /pay name 25")}}
-  const im=pimg;$("#msg").value="";clearPend();
-  await api("send",{text:t,img:im});
+  const c=t.match(/^\/pay\s+(\S+)\s+(\d+)$/i);
+  if(c)return pay(c[1],+c[2]);
+  if(t[0]==="/")return toast("Try /pay name 25");
+  await api("send",{text:t});
  }catch(x){}
 };
-// ---- pictures: shrunk in the browser before sending
-function shrink(f,max,lim){return new Promise((ok,no)=>{
- if(!f||!f.type.startsWith("image/"))return no(new Error("Choose an image file"));
- const rd=new FileReader();rd.onerror=()=>no(new Error("Couldn’t read that image"));
- rd.onload=()=>{const im=new Image();im.onerror=()=>no(new Error("Couldn’t read that image"));
-  im.onload=()=>{const s=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement("canvas"),x=c.getContext("2d");
-   for(const k of[1,.75,.5])for(const q of[.8,.6,.45]){c.width=Math.max(1,Math.round(im.width*s*k));c.height=Math.max(1,Math.round(im.height*s*k));x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);const u=c.toDataURL("image/jpeg",q);if(u.length<lim)return ok(u)}
-   no(new Error("That picture is too detailed"))};
-  im.src=rd.result};rd.readAsDataURL(f)})}
-const hasFiles=e=>[...((e.dataTransfer&&e.dataTransfer.types)||[])].includes("Files");
-let pimg="";
-function clearPend(){pimg="";$("#pend").hidden=true;$("#pendimg").removeAttribute("src");$("#mf").value=""}
-async function attach(f){try{pimg=await shrink(f,600,58000);$("#pendimg").src=pimg;$("#pend").hidden=false}catch(x){toast(x.message)}}
-$("#mf").onchange=e=>{const f=e.target.files[0];if(f)attach(f)};
-$("#pendx").onclick=clearPend;
-$("#msg").addEventListener("paste",e=>{const f=[...((e.clipboardData&&e.clipboardData.files)||[])].find(x=>x.type.startsWith("image/"));if(f){e.preventDefault();attach(f)}});
-const dz=(el,fn)=>{
- el.addEventListener("dragover",e=>{if(hasFiles(e)){e.preventDefault();el.classList.add("drag")}});
- el.addEventListener("dragleave",e=>{if(!el.contains(e.relatedTarget))el.classList.remove("drag")});
- el.addEventListener("drop",e=>{if(!hasFiles(e))return;e.preventDefault();el.classList.remove("drag");fn([...e.dataTransfer.files])});
-};
-dz($("#p-chat"),fs=>{const f=fs.find(x=>x.type.startsWith("image/"));if(f)attach(f);else toast("Drop a picture file")});
-addEventListener("dragover",e=>{if(hasFiles(e))e.preventDefault()});
-addEventListener("drop",e=>{if(hasFiles(e))e.preventDefault()});
 async function pay(to,amt){await api("pay",{to,amt});toast(`Sent ${amt} coins to ${to}`)}
 
 const MAX_SELL=5,ico=i=>i.img?`<img class="ico" src="${esc(i.img)}" alt="">`:`<div class="e">${esc(i.emoji||"🎁")}</div>`;
@@ -349,7 +273,7 @@ function renderShop(){
  $("#shoplist").innerHTML=list.length?list.map(([id,i])=>{
   const out=i.stock===0,own=i.seller===meId,poor=m&&!m.inf&&m.coins<i.price,sp=i.seller&&players[i.seller];
   return `<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${i.kind==="physical"?'<span class="tag">real</span>':""}${mkTag(i)}${rb2(i.rarity)}<small>${esc(i.desc||"")}${i.stock>0?` · ${i.stock} left`:""}</small>${i.seller?`<small>Sold by ${esc(sp?sp.name:"a cat")}</small>`:""}<span class="price">${i.price?"🪙 "+i.price:"Free"}</span></div>${own?`<button class="ghost" data-cancel="${id}">Cancel</button>`:`<button data-buy="${id}" ${out||poor?"disabled":""}>${out?"Sold out":i.price?"Buy":"Get"}</button>`}</div>`}).join(""):`<div class="empty">Nothing for sale yet. List the first item above!</div>`;
- $("#packlist").innerHTML=Object.values(packs).filter(k=>k.listed).map(k=>{const out=k.stock===0,poor=!m.inf&&m.coins<k.price;return `<div class="card" style="flex-wrap:wrap"><div class="e">${esc(k.emoji||"🎁")}</div><div class="i"><b>${esc(k.name)}</b><small>${k.contents.length} possible prizes${k.stock>0?` · ${k.stock} left`:""}</small><small>${odds(k)}</small><span class="price">${k.price?"🪙 "+k.price:"Free"}</span></div><button data-bpack="${k.id}" ${out||poor?"disabled":""}>${out?"Sold out":"Open"}</button><details style="flex-basis:100%"><summary>What’s inside</summary>${k.contents.map(c=>`<small>${c.t==="cat"?"🐱 ":c.t==="move"?"⚔️ ":""}${esc(c.name)} ${rb(c.rarity)}${c.fill?" <i>(everything else)</i>":""}</small>`).join("")}</details></div>`}).join("")||'<div class="empty">No packs yet.</div>';
+ $("#packlist").innerHTML=Object.values(packs).map(k=>{const out=k.stock===0,poor=!m.inf&&m.coins<k.price;return `<div class="card" style="flex-wrap:wrap"><div class="e">${esc(k.emoji||"🎁")}</div><div class="i"><b>${esc(k.name)}</b><small>${k.contents.length} possible prizes${k.stock>0?` · ${k.stock} left`:""}</small><small>${odds(k)}</small><span class="price">${k.price?"🪙 "+k.price:"Free"}</span></div><button data-bpack="${k.id}" ${out||poor?"disabled":""}>${out?"Sold out":"Open"}</button><details style="flex-basis:100%"><summary>What’s inside</summary>${k.contents.map(c=>`<small>${c.t==="cat"?"🐱 ":c.t==="move"?"⚔️ ":""}${esc(c.name)} ${rb(c.rarity)}${c.fill?" <i>(everything else)</i>":""}</small>`).join("")}</details></div>`}).join("")||'<div class="empty">No packs yet.</div>';
  const oc=m.cats||[];
  $("#catlist").innerHTML=Object.values(cats).filter(c=>c.listed&&!c.owner&&!c.po).map(c=>{const has=oc.includes(c.id),poor=!m.inf&&m.coins<c.price;return `<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b>${rb2(c.rarity)}<div>${tbs(c.t)}</div>${c.evo?`<small>Evolves at level ${c.evo.lvl}</small>`:""}<small>${c.hp} HP${c.stock>0?` · ${c.stock} left`:""}</small><span class="price">${c.price?"🪙 "+c.price:"Free"}</span></div><button data-bcat="${c.id}" ${has||poor||c.stock===0?"disabled":""}>${has?"Owned":c.stock===0?"Sold out":c.price?"Buy":"Get"}</button></div>`}).join("")||'<div class="empty">No cats for sale yet.</div>';
 }
@@ -360,7 +284,7 @@ $("#p-shop").onclick=async e=>{
   if(d.buy){await api("buy",{id:d.buy});toast("Bought "+(items[d.buy]?items[d.buy].name:"item"))}
   else if(d.cancel){await api("item/cancel",{id:d.cancel});toast("Listing cancelled")}
   else if(d.bcat){await api("cat/buy",{id:d.bcat});toast("Cat added to your collection")}
-  else if(d.bpack){const j=await api("pack/buy",{id:d.bpack}),r=j.res||{};toast(`🎉 You got ${r.emoji||""} ${r.name}${r.rarity?` (${r.rarity})`:""}${r.dup?` — you already had it, so you got ${r.refund} coins back`:""}`,5000)}
+  else if(d.bpack){const j=await api("pack/buy",{id:d.bpack}),r=j.res||{};toast(`🎉 You got ${r.emoji||""} ${r.name} (${r.rarity})${r.dup?` — you already had it, so you got ${r.refund} coins back`:""}`,5000)}
  }catch(x){}
 };
 $("#p-shop").onsubmit=async e=>{
@@ -448,47 +372,37 @@ function renderAdmin(){
  const lst=[...Object.values(items).filter(i=>i.listed&&!i.seller),...Object.values(cats).filter(c=>c.listed&&!c.owner),...Object.values(moves).filter(k=>k.listed&&!k.owner)];
  const rnames=[...new Set(lst.map(x=>x.rarity||"~"))],rarl=[...new Set([...RAR,...rnames.filter(r=>r!=="~")])].map(r=>`<option value="${esc(r)}">`).join("");
  const fopts=[...Object.values(items).filter(i=>i.listed&&!i.seller).map(i=>["item",i.id,(i.emoji||"🎁")+" "+i.name]),...Object.values(cats).filter(c=>c.listed&&!c.owner).map(c=>["cat",c.id,"🐱 "+c.name]),...Object.values(moves).filter(k=>k.listed&&!k.owner).map(k=>["move",k.id,"⚔️ "+k.name])].map(([t,id,l])=>`<option value="${t}:${id}">${esc(l)}</option>`).join("");
- const hid=[...Object.values(items).filter(i=>!i.listed&&!i.seller).map(i=>["item",i.id,(i.emoji||"🎁")+" "+i.name]),...Object.values(cats).filter(c=>!c.listed&&!c.owner).map(c=>["cat",c.id,"🐱 "+c.name]),...Object.values(moves).filter(k=>!k.listed&&!k.owner).map(k=>["move",k.id,"⚔️ "+k.name]),...Object.values(packs).filter(k=>!k.listed).map(k=>["pack",k.id,(k.emoji||"🎁")+" "+k.name+" (pack)"]),...Object.values(wilds).filter(w=>!w.listed).map(w=>["wild",w.id,"🌿 Wild "+(cats[w.cat]?cats[w.cat].name:"cat")]),...Object.values(trainers).filter(t=>!t.listed).map(t=>["trainer",t.id,"🧢 "+t.name])];
- const wcat=Object.values(cats).filter(c=>!c.owner).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
- const mvList=Object.values(moves).filter(k=>!k.owner),kopen=[...box.querySelectorAll("details[data-dk][open]")].map(d=>d.dataset.dk);
- const mvPick=pre=>mvList.length?`<details data-dk="${pre}" style="flex-basis:100%"><summary>Attacks (optional, up to 4)</summary><div style="display:grid;gap:.3rem;padding:.4rem 0">${mvList.map(k=>`<label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="${pre}_${k.id}" value="${k.id}" style="width:auto">${esc(k.name)} ${tb(k.type||"normal")} <small>${k.heal>0?"heals "+k.heal+"%":k.damage+" dmg"}</small></label>`).join("")}</div></details>`:"<small>Create some abilities first to pick attacks.</small>";
+ const hid=[...Object.values(items).filter(i=>!i.listed&&!i.gone&&!i.seller).map(i=>["item",i.id,(i.emoji||"🎁")+" "+i.name]),...Object.values(cats).filter(c=>!c.listed&&!c.gone&&!c.owner).map(c=>["cat",c.id,"🐱 "+c.name]),...Object.values(moves).filter(k=>!k.listed&&!k.gone&&!k.owner).map(k=>["move",k.id,"⚔️ "+k.name])];
  box.innerHTML=`<datalist id="rarlist">${rarl}</datalist><h2>Add shop item</h2>
  <form id="af" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji (if no picture)" maxlength="4"><input name="name" placeholder="Item name" required maxlength="40"></div>${imgField("item")}
  <input name="desc" placeholder="Description" maxlength="80"><div class="row"><input name="price" type="number" min="0" placeholder="Price (0 = free)" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div>
- <select name="kind"><option value="normal">Normal item (can be sold back)</option><option value="fun">Fun item (can be thrown away)</option><option value="physical">Real item (a real prize)</option><option value="attackmaker">Attack maker (player creates an attack, then it is used up)</option><option value="catmaker">Cat maker (player creates a cat, then it is used up)</option><option value="heal">Healing item (restores HP in battle)</option><option value="catcher">Catcher (tries to catch a wild cat)</option></select><input name="cap" type="number" min="1" placeholder="Number: maker max damage/HP, HP healed, or catch % (1-100)">${rarSel}${poBox}${giveBox}<button>Add item</button></form>
- <h2>Items</h2>${Object.entries(items).filter(([,i])=>i.listed).map(([id,i])=>`<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${rb2(i.rarity)}<small>${i.price?"🪙 "+i.price:"Free"}${i.seller?" · player listing":""}${i.po?" · packs only":""}</small></div><div style="display:grid;gap:.4rem"><button class="ghost" data-rm="${id}">Ignore</button><button class="bad" data-pdel="item:${id}">Delete forever</button></div></div>`).join("")||'<div class="empty">No items.</div>'}
- <h2>Create a cat</h2><form id="cf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Cat name" required maxlength="30"><input name="hp" type="number" min="1" max="10000000" placeholder="HP (like 50)" required><input name="price" type="number" min="0" placeholder="Price (0 = free)"><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div>${imgField("cat")}<div class="row"><select name="t1" title="Type">${typeOpts()}</select><select name="t2" title="Second type (optional)"><option value="">no 2nd type</option>${typeOpts()}</select></div>${rarSel}<label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="po" style="width:auto">Not sold in the shop (evolution form)</label>${giveBox}<button>Create cat</button></form>
- ${Object.values(cats).filter(c=>c.listed&&!c.owner).map(c=>`<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b>${rb2(c.rarity)}<small>${c.hp} HP · ${c.price?"🪙 "+c.price:"free"}${c.stock>=0?` · ${c.stock} left`:""}${c.po?" · evolution only":""}</small>${tbs(c.t)}${c.evo?`<small>Evolves at level ${c.evo.lvl} into ${c.evo.to.map(id=>cats[id]?esc(cats[id].name):"?").join(" / ")}</small>`:""}</div><button class="ghost" data-evoedit="${c.id}">Evolution…</button><div style="display:grid;gap:.4rem"><button class="ghost" data-rmcat="${c.id}">Ignore</button><button class="bad" data-pdel="cat:${c.id}">Delete forever</button></div></div>`).join("")}
+ <select name="kind"><option value="normal">Normal item (can be sold back)</option><option value="fun">Fun item (can be thrown away)</option><option value="physical">Real item (a real prize)</option><option value="attackmaker">Attack maker (player creates an attack, then it is used up)</option><option value="catmaker">Cat maker (player creates a cat, then it is used up)</option></select><input name="cap" type="number" min="1" placeholder="Max damage / max HP (for makers only)">${rarSel}${poBox}<button>Add item</button></form>
+ <h2>Items</h2>${Object.entries(items).filter(([,i])=>i.listed).map(([id,i])=>`<div class="card">${ico(i)}<div class="i"><b>${esc(i.name)}</b>${rb2(i.rarity)}<small>${i.price?"🪙 "+i.price:"Free"}${i.seller?" · player listing":""}${i.po?" · packs only":""}</small></div><button class="bad" data-rm="${id}">Remove from shop</button></div>`).join("")||'<div class="empty">No items.</div>'}
+ <h2>Create a cat</h2><form id="cf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Cat name" required maxlength="30"><input name="hp" type="number" min="1" max="10000000" placeholder="HP (like 50)" required><input name="price" type="number" min="0" placeholder="Price (0 = free)"><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div>${imgField("cat")}<div class="row"><select name="t1" title="Type">${typeOpts()}</select><select name="t2" title="Second type (optional)"><option value="">no 2nd type</option>${typeOpts()}</select></div>${rarSel}<label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="po" style="width:auto">Not sold in the shop (evolution form)</label><button>Create cat</button></form>
+ ${Object.values(cats).filter(c=>c.listed&&!c.owner).map(c=>`<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>${esc(c.name)}</b>${rb2(c.rarity)}<small>${c.hp} HP · ${c.price?"🪙 "+c.price:"free"}${c.stock>=0?` · ${c.stock} left`:""}${c.po?" · evolution only":""}</small>${tbs(c.t)}${c.evo?`<small>Evolves at level ${c.evo.lvl} into ${c.evo.to.map(id=>cats[id]?esc(cats[id].name):"?").join(" / ")}</small>`:""}</div><button class="ghost" data-evoedit="${c.id}">Evolution…</button><button class="bad" data-rmcat="${c.id}">Remove from shop</button></div>`).join("")}
  <h2>Create an ability</h2><form id="mf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Ability name" required maxlength="30"><input name="damage" type="number" min="1" placeholder="Damage" required><input name="price" type="number" min="0" placeholder="Price (0 = free)" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div>
- <div class="row" style="align-items:center"><select name="type" title="Type">${typeOpts()}</select>${animSel}<button type="button" class="ghost" data-pvbtn>Preview animation</button><div class="fi" data-pid="__pv" style="flex:none;min-width:70px;width:70px"><div class="noimg" style="width:70px;height:70px;font-size:2rem">🐱</div><span class="fx"></span></div></div><div class="row"><button type="button" class="ghost" data-afxopen>Draw / upload animation…</button><button type="button" class="ghost" data-afxrm>Remove custom</button></div><small id="afxsum"></small><div class="row"><input name="heal" type="number" min="1" max="100" placeholder="Healing move: heals this % of max HP (damage is ignored)"></div><div class="row"><select name="st" title="Status effect"><option value="">Status: automatic by type</option><option value="none">No status effect</option><option value="poison">Poison</option><option value="burn">Burn</option><option value="paralysis">Paralysis</option><option value="sleep">Sleep</option><option value="freeze">Freeze</option></select><input name="sc" type="number" min="1" max="100" placeholder="Status chance % (default 30)"></div>${rarSel}${poBox}${giveBox}<button>Create ability</button></form>
- ${Object.values(moves).filter(k=>k.listed&&!k.owner).map(k=>`<div class="card"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}${tb(k.type||"normal")}<small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)} · 🪙 ${k.price}${k.stock>=0?` · ${k.stock} left`:""}${k.po?" · packs only":""}</small></div><div style="display:grid;gap:.4rem"><button class="ghost" data-rmmove="${k.id}">Ignore</button><button class="bad" data-pdel="move:${k.id}">Delete forever</button></div></div>`).join("")}
- <h2>Wild cats</h2><form id="wdf" class="card" style="display:grid;gap:.5rem"><div class="row"><select name="cat" required>${wcat}</select><input name="lvl" type="number" min="1" max="100" placeholder="Level" required><input name="reward" type="number" min="0" placeholder="Coins for winning (0 = none)"></div>${mvPick("wm")}<button>Add wild cat</button></form>
- ${Object.values(wilds).filter(w=>w.listed).map(w=>`<div class="card"><div class="i"><b>🌿 Wild ${cats[w.cat]?esc(cats[w.cat].name):"cat"}</b><small>Level ${w.lvl}${w.reward?` · wins ${w.reward} coins`:""}</small>${(w.moves||[]).length?`<small>Attacks: ${w.moves.map(id=>moves[id]?esc(moves[id].name):"?").join(", ")}</small>`:""}</div><div style="display:grid;gap:.4rem"><button class="ghost" data-rmwild="${w.id}">Ignore</button><button class="bad" data-pdel="wild:${w.id}">Delete forever</button></div></div>`).join("")}
- <h2>Trainers</h2><form id="trf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="name" placeholder="Trainer name" required maxlength="30"><input name="reward" type="number" min="0" placeholder="First-win prize in coins"></div>${imgField("trainer")}<small>Up to 6 cats, with their levels:</small>${[1,2,3,4,5,6].map(n=>`<div class="row"><select name="tc${n}"><option value="">(none)</option>${wcat}</select><input name="tl${n}" type="number" min="1" max="100" value="5" placeholder="Level">${mvPick("tm"+n)}</div>`).join("")}<button>Add trainer</button></form>
- ${Object.values(trainers).filter(t=>t.listed).map(t=>`<div class="card">${t.img?`<img class="ico" src="${esc(t.img)}" alt="">`:'<div class="e">🧢</div>'}<div class="i"><b>${esc(t.name)}</b><small>${t.team.map(e=>cats[e.cat]?esc(cats[e.cat].name)+" Lv "+e.lvl+((e.moves||[]).length?" ["+e.moves.map(id=>moves[id]?esc(moves[id].name):"?").join("/")+"]":""):"?").join(", ")}</small></div><div style="display:grid;gap:.4rem"><button class="ghost" data-rmtrainer="${t.id}">Ignore</button><button class="bad" data-pdel="trainer:${t.id}">Delete forever</button></div></div>`).join("")}
+ <div class="row" style="align-items:center"><select name="type" title="Type">${typeOpts()}</select>${animSel}<button type="button" class="ghost" data-pvbtn>Preview animation</button><div class="fi" data-pid="__pv" style="flex:none;min-width:70px;width:70px"><div class="noimg" style="width:70px;height:70px;font-size:2rem">🐱</div><span class="fx"></span></div></div><div class="row"><button type="button" class="ghost" data-afxopen>Draw / upload animation…</button><button type="button" class="ghost" data-afxrm>Remove custom</button></div><small id="afxsum"></small>${rarSel}${poBox}<button>Create ability</button></form>
+ ${Object.values(moves).filter(k=>k.listed&&!k.owner).map(k=>`<div class="card"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}${tb(k.type||"normal")}<small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)} · 🪙 ${k.price}${k.stock>=0?` · ${k.stock} left`:""}${k.po?" · packs only":""}</small></div><button class="bad" data-rmmove="${k.id}">Remove from shop</button></div>`).join("")}
  <h2>Create a pack</h2><form id="pf" class="card" style="display:grid;gap:.5rem"><div class="row"><input name="emoji" placeholder="Emoji" maxlength="4"><input name="name" placeholder="Pack name" required maxlength="30"></div><div class="row"><input name="price" type="number" min="0" placeholder="Price (0 = free)" required><input name="stock" type="number" min="1" placeholder="Stock (blank = unlimited)"></div><b>Chance of each rarity, in % (optional; blank = equal odds)</b><div class="row">${rnames.map(r=>`<label>${r==="~"?'<span class="rar r-common">no rarity</span>':rb(r)}<input data-ch="${esc(r)}" type="number" min="0" max="100" step="any" placeholder="%"></label>`).join("")}</div><label>Leftover chance goes to<select name="filler"><option value="">Nothing (scale the chances to 100%)</option>${fopts}</select></label><b>What can be inside</b>${pcs}<button>Create pack</button></form>
- ${Object.values(packs).filter(k=>k.listed).map(k=>`<div class="card"><div class="e">${esc(k.emoji||"🎁")}</div><div class="i"><b>${esc(k.name)}</b><small>🪙 ${k.price} · ${k.contents.length} prizes${k.stock>=0?` · ${k.stock} left`:""}</small><small>${odds(k)}</small></div><div style="display:grid;gap:.4rem"><button class="ghost" data-rmpack="${k.id}">Ignore</button><button class="bad" data-pdel="pack:${k.id}">Delete forever</button></div></div>`).join("")}
- ${hid.length?`<h2>Ignored (hidden from the shop)</h2>`+hid.map(([t,id,l])=>`<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(l)}</b><small>Players who own it keep it</small></div><button class="ghost" data-restore="${t}:${id}">Put back in shop</button><button class="bad" data-pdel="${t}:${id}">Delete forever</button></div>`).join(""):""}
- <h2>Players</h2>${ps.map(([id,p])=>{const self=id===ROOT;return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}<small>🪙 ${p.inf?"∞":p.coins}</small></div>${self?"":`<button class="ghost" data-adm="${id}">${p.admin?"Remove admin":"Make admin"}</button>`}${R&&!self?`<div class="row" style="flex-basis:100%"><input type="number" placeholder="Coins (− takes)" data-amt="${id}"><button data-give="${id}">Give</button></div>`:""}${!self&&id!==meId&&(R||!p.admin)?`<button class="bad" data-ban="${id}">Ban + delete</button>`:""}</div>`}).join("")}
+ ${Object.values(packs).map(k=>`<div class="card"><div class="e">${esc(k.emoji||"🎁")}</div><div class="i"><b>${esc(k.name)}</b><small>🪙 ${k.price} · ${k.contents.length} prizes${k.stock>=0?` · ${k.stock} left`:""}</small><small>${odds(k)}</small></div><button class="bad" data-rmpack="${k.id}">Remove</button></div>`).join("")}
+ ${hid.length?`<h2>Removed from shop</h2>`+hid.map(([t,id,l])=>`<div class="card"><div class="i"><b>${esc(l)}</b><small>Players who own it keep it</small></div><button class="ghost" data-restore="${t}:${id}">Put back in shop</button><button class="bad" data-del="${t}:${id}">Delete</button></div>`).join(""):""}
+ <h2>Players</h2>${ps.map(([id,p])=>{const self=id===ROOT;return `<div class="card" style="flex-wrap:wrap"><div class="i"><b>${esc(p.name)}</b>${p.admin?'<span class="tag">admin</span>':""}<small>🪙 ${p.inf?"∞":p.coins}</small></div>${self?"":`<button class="ghost" data-adm="${id}">${p.admin?"Remove admin":"Make admin"}</button>`}${R&&!self?`<div class="row" style="flex-basis:100%"><input type="number" placeholder="Coins (− takes)" data-amt="${id}"><button data-give="${id}">Give</button><button class="bad" data-ban="${id}">Ban + delete</button></div>`:""}</div>`}).join("")}
  ${R?`<button class="ghost" data-inf>${me().inf?"Turn infinite coins off":"Turn infinite coins on"}</button>${blk.length?`<h2>Banned names</h2>${blk.map(id=>`<div class="card"><div class="i"><b>${esc(id)}</b></div><button class="ghost" data-unban="${esc(id)}">Let them sign up again</button></div>`).join("")}`:""}`:""}
  <h2>Banned username words</h2><form id="wf" class="card" style="display:flex;gap:.5rem;flex-wrap:wrap"><input name="w" placeholder="Word to block in usernames" maxlength="16" required><button>Ban word</button></form>${(me().words||[]).map(w=>`<div class="card"><div class="i"><b>${esc(w)}</b></div><button class="ghost" data-unw="${esc(w)}">Remove</button></div>`).join("")}
  <h2>Chat</h2><button class="bad" data-clear>Clear all messages</button>`;
  for(const[f,n,v]of keep){const el=box.querySelector(`#${f} [name=${n}]`);if(el){if(el.type==="checkbox")el.checked=v;else el.value=v}}
  for(const x of box.querySelectorAll("[data-pc]"))x.checked=kpc.includes(x.dataset.pc);
- for(const d of box.querySelectorAll("details[data-dk]"))d.open=kopen.includes(d.dataset.dk);
  for(const x of box.querySelectorAll("[data-ch]"))x.value=kch[x.dataset.ch]||"";
  afxSummary();
 }
 $("#p-admin").onsubmit=async e=>{
  e.preventDefault();if(!isAdmin())return;const f=new FormData(e.target),id=e.target.id;
  try{
-  if(id==="af"){await api("item/add",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),stock:f.get("stock"),kind:f.get("kind"),cap:f.get("cap"),rarity:f.get("rarity"),po:!!f.get("po"),give:!!f.get("give"),img:imgs.item});setImg("item","");toast("Item added")}
+  if(id==="af"){await api("item/add",{name:f.get("name"),emoji:f.get("emoji"),desc:f.get("desc"),price:f.get("price"),stock:f.get("stock"),kind:f.get("kind"),cap:f.get("cap"),rarity:f.get("rarity"),po:!!f.get("po"),img:imgs.item});setImg("item","");toast("Item added")}
   else if(id==="pf"){const contents=[...e.target.querySelectorAll("[data-pc]:checked")].map(x=>{const[t,i]=x.dataset.pc.split(":");return{t,id:+i}}),chances={};e.target.querySelectorAll("[data-ch]").forEach(x=>{if(x.value!=="")chances[x.dataset.ch]=x.value});const fv=f.get("filler");await api("pack/add",{name:f.get("name"),emoji:f.get("emoji"),price:f.get("price"),stock:f.get("stock"),chances,contents,filler:fv?{t:fv.split(":")[0],id:+fv.split(":")[1]}:null});toast("Pack created")}
-  else if(id==="wdf"){await api("wild/add",{cat:f.get("cat"),lvl:f.get("lvl"),reward:f.get("reward"),moves:[...e.target.querySelectorAll("[name^=wm_]:checked")].map(x=>+x.value)});toast("Wild cat added")}
-  else if(id==="trf"){const team=[1,2,3,4,5,6].map(n=>({cat:f.get("tc"+n),lvl:f.get("tl"+n),moves:[...e.target.querySelectorAll(`[name^=tm${n}_]:checked`)].map(x=>+x.value)})).filter(e=>e.cat);await api("trainer/add",{name:f.get("name"),reward:f.get("reward"),team,img:imgs.trainer});setImg("trainer","");toast("Trainer added")}
   else if(id==="wf"){await api("word/ban",{w:f.get("w")});toast("Word banned")}
-  else if(id==="cf"){await api("cat/add",{name:f.get("name"),hp:f.get("hp"),price:f.get("price"),stock:f.get("stock"),rarity:f.get("rarity"),po:!!f.get("po"),t1:f.get("t1"),t2:f.get("t2"),give:!!f.get("give"),img:imgs.cat});setImg("cat","");toast("Cat created")}
-  else if(id==="mf"){await api("move/add",{name:f.get("name"),damage:f.get("damage"),price:f.get("price"),anim:f.get("anim"),type:f.get("type"),st:f.get("st"),sc:f.get("sc"),heal:f.get("heal"),give:!!f.get("give"),stock:f.get("stock"),rarity:f.get("rarity"),po:!!f.get("po"),fx:afx&&afx.t==="gif"?{t:"gif",g:afx.url}:afx&&afx.t==="frames"?{t:"frames",f:afx.urls,ms:afx.ms}:null});afx=null;afr=[];agif="";afxSummary();toast("Ability created")}
+  else if(id==="cf"){await api("cat/add",{name:f.get("name"),hp:f.get("hp"),price:f.get("price"),stock:f.get("stock"),rarity:f.get("rarity"),po:!!f.get("po"),t1:f.get("t1"),t2:f.get("t2"),img:imgs.cat});setImg("cat","");toast("Cat created")}
+  else if(id==="mf"){await api("move/add",{name:f.get("name"),damage:f.get("damage"),price:f.get("price"),anim:f.get("anim"),type:f.get("type"),stock:f.get("stock"),rarity:f.get("rarity"),po:!!f.get("po"),fx:afx&&afx.t==="gif"?{t:"gif",g:afx.url}:afx&&afx.t==="frames"?{t:"frames",f:afx.urls,ms:afx.ms}:null});afx=null;afr=[];agif="";afxSummary();toast("Ability created")}
   e.target.reset();
  }catch(x){}
 };
@@ -499,17 +413,15 @@ $("#p-admin").onclick=async e=>{
   else if(d.rmcat)await api("cat/remove",{id:d.rmcat});
   else if(d.evoedit)openEvo(d.evoedit);
   else if(d.restore){const[t,id]=d.restore.split(":");await api("shop/restore",{kind:t,id})}
+  else if(d.del){const[t,id]=d.del.split(":");await api("shop/delete",{kind:t,id})}
   else if(d.rmmove)await api("move/remove",{id:d.rmmove});
   else if(d.rmpack)await api("pack/remove",{id:d.rmpack});
-  else if(d.pdel){const[k,id]=d.pdel.split(":");if(confirm("Delete this forever? Players who own it will lose it too. This can’t be undone."))await api("shop/delete",{kind:k,id})}
-  else if(d.rmwild)await api("wild/remove",{id:d.rmwild});
-  else if(d.rmtrainer)await api("trainer/remove",{id:d.rmtrainer});
   else if("pvbtn" in d)play("__pv",document.querySelector("#mf [name=anim]").value,afx);
   else if("afxopen" in d){$("#adlg").showModal();renderA()}
   else if("afxrm" in d){afx=null;afxSummary()}
   else if(d.adm)await api("admin/promote",{to:d.adm});
   else if(d.give&&meId===ROOT){const n=parseInt(document.querySelector(`[data-amt="${d.give}"]`).value);if(!n)return toast("Enter an amount");await api("admin/give",{to:d.give,n})}
-  else if(d.ban){if(confirm("Ban this player and delete their account and chat history?"))await api("admin/ban",{to:d.ban})}
+  else if(d.ban&&meId===ROOT){if(confirm("Ban this player and delete their account and chat history?"))await api("admin/ban",{to:d.ban})}
   else if(d.unw)await api("word/unban",{w:d.unw});
   else if(d.unban&&meId===ROOT)await api("admin/unban",{to:d.unban});
   else if("inf" in d&&meId===ROOT){const on=!me().inf;await api("infinite",{on});toast(on?"Infinite coins ON":"Infinite coins OFF")}
@@ -589,7 +501,7 @@ function renderPop(){
 }
 $("#pop").onclick=async e=>{const d=e.target.dataset;
  try{
-  if(d.pacc){const c=document.querySelector("#pop [data-pcat]");await api("battle/accept",{id:d.pacc,cat:c&&c.value});setTab("apps","battle")}
+  if(d.pacc){const c=document.querySelector("#pop [data-pcat]");await api("battle/accept",{id:d.pacc,cat:c&&c.value});setTab("battle")}
   else if("pno" in d)await api("battle/leave");
   else if(d.ptacc){await api("trade/accept",{id:d.ptacc});toast("Trade done")}
   else if(d.ptcan)await api("trade/cancel",{id:d.ptcan});
@@ -634,10 +546,10 @@ function play(pid,a,fx){const f=document.querySelector(`.fi[data-pid="${pid}"]`)
  else if(fx&&fx.t==="frames"&&fx.urls.length){const i=new Image(),ms=fx.ms||120;let k=0;i.src=fx.urls[0];x.appendChild(i);x._t=setInterval(()=>{if(++k<fx.urls.length)i.src=fx.urls[k]},ms);dur=fx.urls.length*ms+150}
  else x.className="fx "+a;
  f.classList.add("hit");setTimeout(()=>{if(x._k!==key)return;clearInterval(x._t);x.innerHTML="";x.className="fx";f.classList.remove("hit")},dur)}
-const fighter=f=>`<div class="fi${stCls(f)}" data-pid="${esc(f.pid)}"><b>${esc(f.tag||f.name+"’s")} ${esc(f.cat.name)}</b>${f.cat.lvl?`<span class="tag">Lv ${f.cat.lvl}</span>`:""}<div>${tbs(f.cat.t)}${stBadge(f)}</div>${f.cat.img?`<img src="${esc(f.cat.img)}" alt="">`:'<div class="noimg">🐱</div>'}<div class="hp"><i style="width:${f.cat.max?Math.round(100*f.hp/f.cat.max):0}%"></i></div><small>${f.hp} / ${f.cat.max} HP</small>${f.team?`<div class="tm">${f.team.map((c,i)=>`<span class="${c.hp<=0?"dn":i===f.cur?"cu":""}" title="${esc(c.name)}">🐱</span>`).join("")}</div>`:""}<span class="fx"></span></div>`;
+const fighter=f=>`<div class="fi" data-pid="${esc(f.pid)}"><b>${esc(f.name)}’s ${esc(f.cat.name)}</b>${f.cat.lvl?`<span class="tag">Lv ${f.cat.lvl}</span>`:""}<div>${tbs(f.cat.t)}</div>${f.cat.img?`<img src="${esc(f.cat.img)}" alt="">`:'<div class="noimg">🐱</div>'}<div class="hp"><i style="width:${f.cat.max?Math.round(100*f.hp/f.cat.max):0}%"></i></div><small>${f.hp} / ${f.cat.max} HP</small>${f.team?`<div class="tm">${f.team.map((c,i)=>`<span class="${c.hp<=0?"dn":i===f.cur?"cu":""}" title="${esc(c.name)}">🐱</span>`).join("")}</div>`:""}<span class="fx"></span></div>`;
 function renderBattle(){
  const box=$("#p-battle"),m=me();if(!m)return;
- const b=m.battle,sg=JSON.stringify([b&&[b.id,b.state,b.n],Object.keys(cats),Object.values(moves).map(k=>[k.id,k.stock,k.listed,k.po]),m.moves,m.eqc,m.cats,m.lv,m.scratch,m.coins,m.inv,Object.values(wilds),Object.values(trainers),m.tw,Object.keys(players).length]);
+ const b=m.battle,sg=JSON.stringify([b&&[b.id,b.state,b.n],Object.keys(cats),Object.values(moves).map(k=>[k.id,k.stock,k.listed,k.po]),m.moves,m.eqc,m.cats,m.lv,m.scratch,m.coins,Object.keys(players).length]);
  if(sg===sig)return;sig=sg;
  const catOpts=Object.values(cats).filter(c=>(m.cats||[]).includes(c.id)).map(c=>`<option value="${c.id}" ${String(c.id)===sel.cat?"selected":""}>${esc(c.name)} · Lv ${((m.lv||{})[c.id]||{}).lvl||1} · ${c.hp} base HP</option>`).join("");
  let h="";
@@ -645,28 +557,20 @@ function renderBattle(){
   h=b.a.pid===meId?`<div class="set"><b>Waiting for ${esc(b.b.name)} to accept…${b.bet?` Bet: ${b.bet} coins each.`:""}</b><button class="ghost" data-leave>Cancel challenge</button></div>`
    :`<div class="set"><b>${esc(b.a.name)} challenges you with ${esc(b.a.cat.name)}!${b.bet?` Bet: ${b.bet} coins each.`:""}</b><select name="cat">${catOpts}</select><div class="row"><button data-acc="${b.id}">Accept</button><button class="ghost" data-leave>Decline</button></div></div>`;
  }else if(b){
-  const sd=b.a.pid===meId?"a":"b",mine=b[sd],turnMe=b.state==="active"&&b[b.turn].pid===meId,known=((m.eqc||{})[mine.cat.id]||[0]).map(id=>id===0?{id:0,name:"Scratch",damage:10,type:"normal"}:moves[id]).filter(Boolean),must=b.state==="active"&&b.need===sd,canGo=turnMe&&!b.need,bitems=Object.entries(m.inv||{}).filter(([id])=>items[id]&&(items[id].kind==="heal"||(items[id].kind==="catcher"&&b.wild)));
-  h=`${b.npc&&b.timg?`<div class="card"><img class="ico" src="${esc(b.timg)}" alt=""><div class="i"><b>${esc(b.b.name)}</b><small>wants to battle!</small></div></div>`:""}<div class="row" style="align-items:flex-start;flex-wrap:nowrap">${fighter(b.a)}${fighter(b.b)}</div>
-  <div class="set"><b>${b.state==="done"?(b.winner===meId?(b.caught?"🎉 You caught it!":"🎉 You won!")+(b.pot?` +${b.pot} coins`:"")+(b.rwd?` +${b.rwd} coins`:""):"You lost this one."+(b.bet?` −${b.bet} coins`:"")):must?"Your cat fainted! Pick the next one":turnMe?"Your turn. Attack or swap cats":"Waiting for "+esc(b[b.turn].name)+"…"}</b>
+  const sd=b.a.pid===meId?"a":"b",mine=b[sd],turnMe=b.state==="active"&&b[b.turn].pid===meId,known=((m.eqc||{})[mine.cat.id]||[0]).map(id=>id===0?{id:0,name:"Scratch",damage:10,type:"normal"}:moves[id]).filter(Boolean),must=b.state==="active"&&b.need===sd,canGo=turnMe&&!b.need;
+  h=`<div class="row" style="align-items:flex-start;flex-wrap:nowrap">${fighter(b.a)}${fighter(b.b)}</div>
+  <div class="set"><b>${b.state==="done"?(b.winner===meId?"🎉 You won!"+(b.pot?` +${b.pot} coins`:""):"You lost this one."+(b.bet?` −${b.bet} coins`:"")):must?"Your cat fainted! Pick the next one":turnMe?"Your turn. Attack or swap cats":"Waiting for "+esc(b[b.turn].name)+"…"}</b>
   ${b.state==="active"&&mine.team?`<div class="row">${mine.team.map((c,i)=>i!==mine.cur&&c.hp>0?`<button class="ghost" data-sw="${c.id}" ${turnMe||must?"":"disabled"}>Swap to ${esc(c.name)} (${c.hp} HP)</button>`:"").join("")}</div>`:""}
-   ${b.state==="active"&&!must?`<div class="row">${known.map(k=>`<button data-mv="${k.id}" ${canGo?"":"disabled"}>${esc(k.name)} · ${k.heal>0?"💚 "+k.heal+"%":k.damage} · ${esc(k.type||"normal")}${stTag(k)}</button>`).join("")}</div>`:""}
-  ${b.state==="active"&&!must&&bitems.length?`<div class="row">${bitems.map(([id,n])=>`<button class="ghost" data-bi="${id}" ${canGo?"":"disabled"}>${esc(items[id].emoji||"")} ${esc(items[id].name)} ×${n}</button>`).join("")}</div>`:""}
+   ${b.state==="active"&&!must?`<div class="row">${known.map(k=>`<button data-mv="${k.id}" ${canGo?"":"disabled"}>${esc(k.name)} · ${k.damage} · ${esc(k.type||"normal")}</button>`).join("")}</div>`:""}
   ${b.state==="done"&&b.gain&&b.gain[meId]?`<small>Your cats earned ${b.gain[meId]} XP each</small>`:""}<small>${b.log.map(esc).join("<br>")}</small><button class="ghost" data-leave>${b.state==="done"?"Close":"Give up"}</button></div>`;
  }else{
   const others=Object.values(players).filter(p=>p.id!==meId&&!p.banned);
-  const lvHp=(c,l)=>Math.round(c.hp*(1+.08*(l-1))),off=!catOpts,
-   wl=Object.values(wilds).filter(x=>x.listed&&cats[x.cat]),tl=Object.values(trainers).filter(x=>x.listed),
-   wildHTML=`<h2>Wild cats</h2>${wl.map(x=>{const c=cats[x.cat];return `<div class="card">${c.img?`<img class="ico" src="${esc(c.img)}" alt="">`:'<div class="e">🐱</div>'}<div class="i"><b>Wild ${esc(c.name)}</b><span class="tag">Lv ${x.lvl}</span><div>${tbs(c.t)}</div><small>${lvHp(c,x.lvl)} HP${x.reward?` · wins ${x.reward} coins`:""}</small></div><button data-wild="${x.id}" ${off?"disabled":""}>Fight</button></div>`}).join("")||'<div class="empty">No wild cats around yet.</div>'}
-  <h2>Trainers</h2>${tl.map(x=>{const beat=(m.tw||[]).includes(x.id);return `<div class="card">${x.img?`<img class="ico" src="${esc(x.img)}" alt="">`:'<div class="e">🧢</div>'}<div class="i"><b>${esc(x.name)}</b><small>${x.team.map(e=>cats[e.cat]?esc(cats[e.cat].name)+" Lv "+e.lvl:"?").join(", ")}</small><small>${x.reward?(beat?"Prize already won":`First win: ${x.reward} coins`):"No prize"}</small></div><button data-trainer="${x.id}" ${off?"disabled":""}>Challenge</button></div>`}).join("")||'<div class="empty">No trainers yet.</div>'}
-  <small style="color:var(--mute)">Wild and trainer fights use the cat picked above as your lead. Use a Catcher item during a wild fight to try to catch it.</small>`;
   h=`<h2>Challenge a player</h2>${catOpts?`<div class="set"><select name="cat">${catOpts}</select><select name="to">${others.map(p=>`<option value="${esc(p.id)}" ${p.id===sel.to?"selected":""}>${esc(p.name)}</option>`).join("")}</select><input name="bet" type="number" min="0" placeholder="Bet (coins)" style="width:7rem"><button data-ch>Challenge</button></div>`:'<div class="empty">You need a cat first. Get one in the Shop tab.</div>'}
-  ${wildHTML}
-  <h2>Abilities for sale</h2>${Object.values(moves).filter(k=>k.listed&&!k.owner&&!k.po).map(k=>{const own=(m.moves||[]).includes(k.id),poor=!m.inf&&m.coins<k.price;return `<div class="card"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}${tb(k.type||"normal")}<small>${k.heal>0?`heals ${k.heal}%`:`${k.damage} damage`}${stTag(k)} · ${k.fx?"custom animation":esc(k.anim)}${k.stock>0?` · ${k.stock} left`:""}</small><span class="price">🪙 ${k.price}</span></div>${own?'<small>Owned · equip in Wallet</small>':`<button data-bm="${k.id}" ${poor||k.stock===0?"disabled":""}>${k.stock===0?"Sold out":"Buy"}</button>`}</div>`}).join("")||'<div class="empty">No abilities for sale yet.</div>'}
+  <h2>Abilities for sale</h2>${Object.values(moves).filter(k=>k.listed&&!k.owner&&!k.po).map(k=>{const own=(m.moves||[]).includes(k.id),poor=!m.inf&&m.coins<k.price;return `<div class="card"><div class="i"><b>${esc(k.name)}</b>${rb2(k.rarity)}${tb(k.type||"normal")}<small>${k.damage} damage · ${k.fx?"custom animation":esc(k.anim)}${k.stock>0?` · ${k.stock} left`:""}</small><span class="price">🪙 ${k.price}</span></div>${own?'<small>Owned · equip in Wallet</small>':`<button data-bm="${k.id}" ${poor||k.stock===0?"disabled":""}>${k.stock===0?"Sold out":"Buy"}</button>`}</div>`}).join("")||'<div class="empty">No abilities for sale yet.</div>'}
   <small style="color:var(--mute)">Everyone starts with a free Scratch (10 damage). Equip abilities on each cat in the Wallet tab.</small>`;
  }
  box.innerHTML=h;
- if(b){if(seen[b.id]===undefined)seen[b.id]=b.n;else if(b.n!==seen[b.id]){seen[b.id]=b.n;const evs=b.seq&&b.seq.length?b.seq:(b.last?[b.last]:[]);
-  evs.forEach((ev,i)=>{const t=ev.by===b.a.pid?b.b.pid:b.a.pid;setTimeout(()=>play(t,ev.anim,ev.fx),30+i*1100)})}}
+ if(b){if(seen[b.id]===undefined)seen[b.id]=b.n;else if(b.n!==seen[b.id]){seen[b.id]=b.n;if(b.last){const t=b.last.by===b.a.pid?b.b.pid:b.a.pid;setTimeout(()=>play(t,b.last.anim,b.last.fx),30)}}}
 }
 $("#p-battle").onchange=e=>{const n=e.target.name;if(n==="cat"||n==="to")sel[n]=e.target.value};
 $("#p-battle").onclick=async e=>{
@@ -677,14 +581,11 @@ $("#p-battle").onclick=async e=>{
   else if("leave" in d)await api("battle/leave");
   else if(d.mv!==undefined)await api("battle/move",{id:me().battle.id,move:d.mv});
   else if(d.sw)await api("battle/switch",{id:me().battle.id,cat:d.sw});
-  else if(d.bi)await api("battle/item",{id:me().battle.id,item:d.bi});
-  else if(d.wild)await api("npc/battle",{kind:"wild",id:d.wild,cat:v("cat")});
-  else if(d.trainer)await api("npc/battle",{kind:"trainer",id:d.trainer,cat:v("cat")});
   else if(d.bm){await api("move/buy",{id:d.bm});toast("Ability learned")}
  }catch(x){}
 };
 // ---- makers: use one from the Wallet to create your own attack or cat (the maker is used up)
-const mkTag=i=>/maker$/.test(i.kind||"")?`<span class="tag">max ${i.cap} ${i.kind==="attackmaker"?"dmg":"HP"}</span>`:i.kind==="heal"?`<span class="tag">heals ${i.cap} HP</span>`:i.kind==="catcher"?`<span class="tag">${i.cap}% catch</span>`:"";
+const mkTag=i=>/maker$/.test(i.kind||"")?`<span class="tag">max ${i.cap} ${i.kind==="attackmaker"?"dmg":"HP"}</span>`:"";
 const afxData=()=>afx&&afx.t==="gif"?{t:"gif",g:afx.url}:afx&&afx.t==="frames"?{t:"frames",f:afx.urls,ms:afx.ms}:null;
 let mk=null;
 function openMaker(id){const i=items[id];if(!i)return;mk=i;const atk=i.kind==="attackmaker";
@@ -701,228 +602,10 @@ $("#mkdlg").onclick=async e=>{const b=e.target.closest("button");if(!b||!mk)retu
    toast(atk?"Attack created! Equip it in your abilities":"Cat created! It’s in your collection");
    afx=null;afr=[];agif="";setImg("mkcat","");$("#mkdlg").close();mk=null}catch(x){}}
 };
-
-// ---- news: the owner builds a page out of blocks (heading, text, picture, link, line)
-let ed={blocks:[]},nsig="",edPrev=false;
-const al=a=>["left","center","right"].includes(a)?a:"left",col=c=>/^#[0-9a-f]{6}$/i.test(c||"")?c:"";
-const blkHTML=(bs,src)=>bs.map(b=>{
- const a=al(b.a),c=col(b.c),st=`text-align:${a}${c?`;color:${c}`:""}`;
- if(b.t==="h")return `<h2 class="bh" style="${st}">${esc(b.x||"")}</h2>`;
- if(b.t==="p")return `<p class="bp" style="${st}${b.b?";font-weight:700":""}${b.i?";font-style:italic":""};font-size:${{s:".85rem",m:"1rem",l:"1.35rem"}[b.s]||"1rem"}">${esc(b.x||"")}</p>`;
- if(b.t==="a")return /^https?:\/\//i.test(b.u||"")?`<div style="text-align:${a}"><a class="bl" href="${esc(b.u)}" target="_blank" rel="noopener noreferrer">${esc(b.x||b.u)}</a></div>`:"";
- if(b.t==="img")return `<div style="text-align:${a}"><img class="nimg" src="${esc(src(b))}" alt=""></div>`;
- if(b.t==="hr")return "<hr>";return ""}).join("");
-const BN={h:"Heading",p:"Text",a:"Link button",img:"Picture",hr:"Line"};
-function edHTML(){
- return ed.blocks.map((b,i)=>{
-  const opt=(o,vals)=>`<select data-o="${o}">${vals.map(([v,l])=>`<option value="${v}" ${(b[o]||vals[0][0])===v?"selected":""}>${l}</option>`).join("")}</select>`;
-  const tools=(b.t!=="hr"?opt("a",[["left","Left"],["center","Centre"],["right","Right"]]):"")
-   +(b.t==="h"||b.t==="p"?`<input type="color" data-o="c" value="${col(b.c)||"#888888"}" title="Colour">`:"")
-   +(b.t==="p"?opt("s",[["m","Normal"],["s","Small"],["l","Large"]])+`<button type="button" class="${b.b?"":"ghost"}" data-bold>B</button><button type="button" class="${b.i?"":"ghost"}" data-ital><i>I</i></button>`:"");
-  const body=b.t==="h"?`<input data-o="x" maxlength="120" placeholder="Heading" value="${esc(b.x||"")}">`
-   :b.t==="p"?`<textarea data-o="x" rows="4" maxlength="3000" placeholder="Write something…">${esc(b.x||"")}</textarea>`
-   :b.t==="a"?`<input data-o="x" maxlength="80" placeholder="Button text" value="${esc(b.x||"")}"><input data-o="u" maxlength="300" placeholder="https://…" value="${esc(b.u||"")}">`
-   :b.t==="img"?`<img class="mi" src="${esc(b.u)}" alt="">`:"<hr>";
-  return `<div class="blk" data-i="${i}"><div class="row" style="align-items:center"><b style="flex:none;min-width:0">${BN[b.t]}</b>${tools}<button type="button" class="ghost" data-mv="-1" style="flex:none;min-width:0">↑</button><button type="button" class="ghost" data-mv="1" style="flex:none;min-width:0">↓</button><button type="button" class="bad" data-rm style="flex:none;min-width:0">✕</button></div>${body}</div>`}).join("")||"<small>Add blocks below to build your page.</small>"}
-function renderEd(){const f=$("#nf");if(!f)return;$("#edb").innerHTML=edHTML();
- const p=$("#edp"),t=f.elements.title.value.trim();p.hidden=!edPrev;
- p.innerHTML=edPrev?`<article class="news">${t?`<h2 class="bh">${esc(t)}</h2>`:""}${blkHTML(ed.blocks,b=>b.u)||"<small>Nothing to preview yet.</small>"}</article>`:""}
-function renderNews(){
- const box=$("#p-news");if(!box)return;
- if(!$("#nwl"))box.innerHTML=`<div id="nwc"></div><div id="nwl" style="display:grid;gap:.7rem"></div>`;
- if(!$("#nf")){
-  $("#nwc").innerHTML=`<h2>Write a news post</h2><form id="nf" class="set"><input name="title" maxlength="100" placeholder="Page title"><div id="edb" style="display:grid;gap:.6rem"></div><div class="row"><button type="button" class="ghost" data-add="h">+ Heading</button><button type="button" class="ghost" data-add="p">+ Text</button><label class="clip" style="min-width:90px">+ Picture<input type="file" accept="image/*" data-nimg hidden></label><button type="button" class="ghost" data-add="a">+ Link</button><button type="button" class="ghost" data-add="hr">+ Line</button></div><div id="edp" hidden></div><div class="row"><button type="button" class="ghost" data-prev>Preview</button><button>Publish</button></div></form>`;
-  renderEd()}
- const sg=JSON.stringify(news.map(n=>n.id))+meId+isAdmin();if(sg===nsig)return;nsig=sg;
- $("#nwl").innerHTML=`<h2>News</h2>`+(news.map(n=>{let bs=null;try{bs=n.body?JSON.parse(n.body):null}catch(x){}
-  return `<article class="news">${n.title?`<h2 class="bh">${esc(n.title)}</h2>`:""}${bs?blkHTML(bs,b=>"/img/nimg/"+b.k):`${n.text?`<div class="nt">${esc(n.text)}</div>`:""}${n.hi?`<a href="/img/news/${n.id}" target="_blank" rel="noopener"><img class="nimg" src="/img/news/${n.id}" alt=""></a>`:""}`}<div class="nd"><span>${n.author&&players[n.author]?"by "+esc(players[n.author].name)+" · ":""}${esc(new Date(n.ts).toLocaleString())}</span>${isAdmin()||n.author===meId?`<button class="bad" data-ndel="${n.id}">Delete</button>`:""}</div></article>`}).join("")||'<div class="empty">No news yet.</div>');
-}
-$("#p-news").oninput=e=>{const el=e.target,o=el.dataset.o,bl=el.closest("[data-i]");if(o&&bl){const b=ed.blocks[+bl.dataset.i];if(b)b[o]=el.value}};
-$("#p-news").onchange=async e=>{const el=e.target;
- if(el.dataset.nimg!==undefined){const f=el.files[0];el.value="";if(!f)return;
-  if(ed.blocks.filter(b=>b.t==="img").length>=(isAdmin()?6:3))return toast(`At most ${isAdmin()?6:3} pictures per page`);
-  try{ed.blocks.push({t:"img",u:await shrink(f,700,140000),a:"center"});renderEd()}catch(x){toast(x.message)}}};
-$("#p-news").onclick=async e=>{const t=e.target.closest("button"),d=t&&t.dataset;if(!d)return;
- const bl=t.closest("[data-i]"),i=bl?+bl.dataset.i:-1;
- if(d.add){if(ed.blocks.length>=(isAdmin()?40:25))return toast(`${isAdmin()?40:25} blocks is the max`);
-  ed.blocks.push(d.add==="hr"?{t:"hr"}:{t:d.add,x:"",a:d.add==="a"?"center":"left",...(d.add==="a"?{u:""}:{}),...(d.add==="p"?{s:"m"}:{})});renderEd()}
- else if(d.mv!==undefined&&i>=0){const j=i+(+d.mv);if(j>=0&&j<ed.blocks.length){[ed.blocks[i],ed.blocks[j]]=[ed.blocks[j],ed.blocks[i]];renderEd()}}
- else if("rm" in d&&i>=0){ed.blocks.splice(i,1);renderEd()}
- else if("bold" in d&&i>=0){ed.blocks[i].b=!ed.blocks[i].b;renderEd()}
- else if("ital" in d&&i>=0){ed.blocks[i].i=!ed.blocks[i].i;renderEd()}
- else if("prev" in d){edPrev=!edPrev;renderEd()}
- else if(d.ndel){if(confirm("Delete this news post?"))try{await api("news/delete",{id:d.ndel})}catch(x){}}};
-$("#p-news").onsubmit=async e=>{
- e.preventDefault();const f=e.target,title=f.elements.title.value.trim();
- if(!title&&!ed.blocks.length)return toast("Add a title or some blocks first");
- const b=f.querySelector("button:not([type])");b.disabled=true;b.textContent="Publishing…";
- try{await api("news/post",{title,blocks:ed.blocks});ed={blocks:[]};edPrev=false;f.reset();renderEd();toast("Page published")}catch(x){}
- b.disabled=false;b.textContent="Publish";
-};
-// ---- apps home (square icons) and the Arcade app
-const APPS=[["news","📰","News"],["battle","⚔️","Battle"],["trade","🔁","Trade"],["arcade","🕹️","Arcade"]];
-function renderHome(){
- const m=me();if(!m)return;
- const bt=m.battle&&((m.battle.state==="pending"&&m.battle.b.pid===meId)||(m.battle.state==="active"&&m.battle[m.battle.turn].pid===meId))?1:0,
-  offers=(m.trades||[]).filter(t=>t.to===meId).length,bdg={battle:bt,trade:offers};
- $("#p-home").innerHTML=`<div class="apps">${APPS.map(([k,e,n])=>`<button class="tile" data-a="${k}"><span>${e}</span><small>${n}</small>${bdg[k]?`<i class="bdg">${bdg[k]}</i>`:""}</button>`).join("")}</div>`;
- if(!$("#p-arcade").firstChild)arcadeMenu();
-}
-$("#p-home").onclick=e=>{const b=e.target.closest("[data-a]");if(b)setTab("apps",b.dataset.a)};
-
-const GAMES=[["snake","🐍","Snake"],["tetris","🧱","Tetris"],["chess","♟️","Chess"],["ttt","⭕","Tic Tac Toe"]];
-let gstop=null,gkey=null;
-const AR=$("#p-arcade");
-function stopGame(){if(gstop){gstop();gstop=null}gkey=null}
-const bestOf=(k,v)=>{const o=+ls.get("arc-"+k)||0;if(v>o)ls.set("arc-"+k,String(v));return Math.max(o,v||0)};
-function arcadeMenu(){AR.innerHTML=`<h2>Arcade</h2><div class="apps">${GAMES.map(([k,e,n])=>`<button class="tile" data-g="${k}"><span>${e}</span><small>${n}</small></button>`).join("")}</div><small style="color:var(--mute)">Best scores are saved on this device.</small>`}
-function openGame(k){
- stopGame();const g=GAMES.find(x=>x[0]===k);
- AR.innerHTML=`<div class="set"><div class="row" style="align-items:center"><button class="ghost" data-gback style="flex:none;min-width:0">← Games</button><b style="flex:1">${g[1]} ${g[2]}</b></div><div id="gs" style="color:var(--coin);font-weight:600"></div><div id="gb" style="display:grid;gap:.6rem;justify-items:center"></div></div>`;
- const setS=t=>{const e=$("#gs");if(e)e.textContent=t};
- ({snake:gSnake,tetris:gTetris,chess:gChess,ttt:gTtt})[k]($("#gb"),setS);
-}
-AR.onclick=e=>{const b=e.target.closest("button");if(!b)return;const d=b.dataset;
- if(d.g)openGame(d.g);else if("gback" in d){stopGame();arcadeMenu()}else if(d.k!==undefined&&gkey)gkey(d.k)};
-addEventListener("keydown",e=>{if(!gkey||(e.target.matches&&e.target.matches("input,textarea,select")))return;if(e.key.startsWith("Arrow")||e.key===" ")e.preventDefault();gkey(e.key)});
-const pad=ks=>`<div class="pad">${ks.map(x=>x?`<button data-k="${x[0]}">${x[1]}</button>`:"<span></span>").join("")}</div>`;
-
-function gSnake(box,setS){
- const N=20,C=18,cv=document.createElement("canvas");cv.width=cv.height=N*C;
- cv.style.cssText="width:min(100%,360px);border:1px solid var(--line);border-radius:10px;touch-action:none;background:var(--bg)";
- box.append(cv);box.insertAdjacentHTML("beforeend",pad([null,["ArrowUp","▲"],null,["ArrowLeft","◀"],["ArrowDown","▼"],["ArrowRight","▶"]]));
- const x=cv.getContext("2d");let s,d,nd,f,score,dead,t;
- const place=()=>{do f={x:Math.floor(Math.random()*N),y:Math.floor(Math.random()*N)};while(s.some(p=>p.x===f.x&&p.y===f.y))};
- const info=()=>setS(`Score ${score} · Best ${bestOf("snake",score)}`);
- const reset=()=>{s=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];d=nd={x:1,y:0};score=0;dead=false;place();info()};
- const draw=()=>{x.clearRect(0,0,cv.width,cv.height);x.fillStyle="#e8602c";x.fillRect(f.x*C+2,f.y*C+2,C-4,C-4);
-  s.forEach((p,i)=>{x.fillStyle=i?"#0f9d73":"#5be3b0";x.fillRect(p.x*C+1,p.y*C+1,C-2,C-2)});
-  if(dead){x.fillStyle="rgba(0,0,0,.55)";x.fillRect(0,0,cv.width,cv.height);x.fillStyle="#fff";x.font="bold 20px sans-serif";x.textAlign="center";x.fillText("Game over · tap or press a key",cv.width/2,cv.height/2)}};
- const step=()=>{if(dead)return;d=nd;const h={x:s[0].x+d.x,y:s[0].y+d.y};
-  if(h.x<0||h.y<0||h.x>=N||h.y>=N||s.some(p=>p.x===h.x&&p.y===h.y)){dead=true;info();draw();return}
-  s.unshift(h);if(h.x===f.x&&h.y===f.y){score++;info();place()}else s.pop();draw()};
- const loop=()=>{step();t=setTimeout(loop,Math.max(60,130-score*3))};
- const DIR={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0}};
- gkey=k=>{if(dead&&(DIR[k]||k==="tap")){reset();draw();return}const m=DIR[k];if(m&&(m.x!==-d.x||m.y!==-d.y))nd=m};
- let tx,ty;
- cv.addEventListener("touchstart",e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
- cv.addEventListener("touchend",e=>{const c=e.changedTouches[0],dx=c.clientX-tx,dy=c.clientY-ty;if(!gkey)return;
-  if(Math.max(Math.abs(dx),Math.abs(dy))<20)return gkey("tap");
-  gkey(Math.abs(dx)>Math.abs(dy)?(dx>0?"ArrowRight":"ArrowLeft"):(dy>0?"ArrowDown":"ArrowUp"))},{passive:true});
- gstop=()=>clearTimeout(t);
- reset();draw();loop();
-}
-
-function gTetris(box,setS){
- const W=10,H=20,C=24,cv=document.createElement("canvas");cv.width=W*C;cv.height=H*C;
- cv.style.cssText="width:min(60vw,240px);border:1px solid var(--line);border-radius:10px;background:var(--bg)";
- box.append(cv);box.insertAdjacentHTML("beforeend",pad([["ArrowLeft","◀"],["ArrowUp","⟳"],["ArrowRight","▶"],null,["ArrowDown","▼"],[" ","⏬"]]));
- const ctx=cv.getContext("2d");
- const TP={I:[[1,1,1,1]],O:[[1,1],[1,1]],T:[[0,1,0],[1,1,1]],S:[[0,1,1],[1,1,0]],Z:[[1,1,0],[0,1,1]],J:[[1,0,0],[1,1,1]],L:[[0,0,1],[1,1,1]]},
-  TC={I:"#58c6d1",O:"#e8c000",T:"#a040a0",S:"#4caf50",Z:"#e8602c",J:"#4a8de8",L:"#e89a2c"};
- let g,p,score,lines,dead,t;
- const rot=m=>m[0].map((_,i)=>m.map(r=>r[i]).reverse());
- const fit=(m,px,py)=>m.every((r,y)=>r.every((v,xx)=>!v||(px+xx>=0&&px+xx<W&&py+y<H&&(py+y<0||!g[py+y][px+xx]))));
- const spawn=()=>{const k="IOTSZJL"[Math.floor(Math.random()*7)];p={k,m:TP[k].map(r=>[...r]),x:Math.floor((W-TP[k][0].length)/2),y:0};if(!fit(p.m,p.x,p.y))dead=true};
- const info=()=>setS(`Score ${score} · Lines ${lines} · Best ${bestOf("tetris",score)}`);
- const lock=()=>{p.m.forEach((r,y)=>r.forEach((v,xx)=>{if(v)g[p.y+y][p.x+xx]=p.k}));let n=0;
-  for(let y=H-1;y>=0;y--)if(g[y].every(Boolean)){g.splice(y,1);g.unshift(Array(W).fill(0));n++;y++}
-  if(n){lines+=n;score+=[0,100,300,500,800][n]}spawn()};
- const cell=(cx,cy,k)=>{ctx.fillStyle=TC[k];ctx.fillRect(cx*C+1,cy*C+1,C-2,C-2)};
- const draw=()=>{ctx.clearRect(0,0,cv.width,cv.height);
-  g.forEach((r,y)=>r.forEach((v,xx)=>{if(v)cell(xx,y,v)}));
-  if(!dead)p.m.forEach((r,y)=>r.forEach((v,xx)=>{if(v)cell(p.x+xx,p.y+y,p.k)}));
-  if(dead){ctx.fillStyle="rgba(0,0,0,.6)";ctx.fillRect(0,0,cv.width,cv.height);ctx.fillStyle="#fff";ctx.textAlign="center";ctx.font="bold 22px sans-serif";ctx.fillText("Game over",cv.width/2,cv.height/2-8);ctx.font="14px sans-serif";ctx.fillText("Press ⟳ or Space",cv.width/2,cv.height/2+18)}};
- const reset=()=>{g=Array.from({length:H},()=>Array(W).fill(0));score=0;lines=0;dead=false;spawn();info()};
- const loop=()=>{if(!dead){if(fit(p.m,p.x,p.y+1))p.y++;else lock();draw();info()}t=setTimeout(loop,Math.max(90,600-Math.floor(lines/10)*50))};
- gkey=k=>{
-  if(dead){if(k==="ArrowUp"||k===" "||k==="Enter"||k==="tap"){reset();draw()}return}
-  if(k==="ArrowLeft"&&fit(p.m,p.x-1,p.y))p.x--;
-  else if(k==="ArrowRight"&&fit(p.m,p.x+1,p.y))p.x++;
-  else if(k==="ArrowDown"){if(fit(p.m,p.x,p.y+1)){p.y++;score++}}
-  else if(k==="ArrowUp"){const r=rot(p.m);for(const dx of[0,-1,1,-2,2])if(fit(r,p.x+dx,p.y)){p.m=r;p.x+=dx;break}}
-  else if(k===" "){while(fit(p.m,p.x,p.y+1)){p.y++;score+=2}lock()}
-  else return;
-  draw();info()};
- gstop=()=>clearTimeout(t);
- reset();draw();loop();
-}
-
-function gChess(box,setS){
- const FEN="rnbqkbnrpppppppp"+"8888"+"PPPPPPPPRNBQKBNR",GL={p:"♟",r:"♜",n:"♞",b:"♝",q:"♛",k:"♚"},VAL={p:100,n:320,b:330,r:500,q:900,k:0};
- let b,turn,sel,legal,over,last,alive=true;
- const isW=c=>c===c.toUpperCase(),col=c=>c?(isW(c)?"w":"b"):"";
- const gen=(bd,i)=>{const c=bd[i],t=c.toLowerCase(),w=isW(c),r=i>>3,f=i&7,out=[];
-  const add=(rr,ff,mode)=>{if(rr<0||rr>7||ff<0||ff>7)return false;const j=rr*8+ff,o=bd[j];if(o&&col(o)===col(c))return false;if(mode===1&&!o)return false;if(mode===2&&o)return false;out.push(j);return !o};
-  if(t==="p"){const d=w?-1:1;if(add(r+d,f,2)&&r===(w?6:1))add(r+2*d,f,2);add(r+d,f-1,1);add(r+d,f+1,1)}
-  else if(t==="n")[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]].forEach(([a,e])=>add(r+a,f+e));
-  else if(t==="k"){for(let a=-1;a<=1;a++)for(let e=-1;e<=1;e++)if(a||e)add(r+a,f+e)}
-  else{const dirs=[];if(t!=="b")dirs.push([1,0],[-1,0],[0,1],[0,-1]);if(t!=="r")dirs.push([1,1],[1,-1],[-1,1],[-1,-1]);
-   for(const[a,e]of dirs)for(let k=1;k<8;k++)if(!add(r+a*k,f+e*k))break}
-  return out};
- const inChk=(bd,c)=>{const k=bd.indexOf(c==="w"?"K":"k");return bd.some((p,i)=>p&&col(p)!==c&&gen(bd,i).includes(k))};
- const promo=(bd,i,j)=>{const nb=[...bd];nb[j]=nb[i];nb[i]="";if(nb[j]==="P"&&j<8)nb[j]="Q";if(nb[j]==="p"&&j>55)nb[j]="q";return nb};
- const lf=(bd,i)=>gen(bd,i).filter(j=>!inChk(promo(bd,i,j),col(bd[i])));
- const anyL=(bd,c)=>bd.some((p,i)=>p&&col(p)===c&&lf(bd,i).length>0);
- const mv=(i,j)=>{b=promo(b,i,j);last=[i,j];turn=turn==="w"?"b":"w";
-  if(!anyL(b,turn))over=inChk(b,turn)?(turn==="w"?"Checkmate. The computer wins.":"Checkmate. You win! 🎉"):"Stalemate. It’s a draw."};
- const ev=bd=>bd.reduce((s,p)=>p?s+(isW(p)?-1:1)*VAL[p.toLowerCase()]:s,0);
- const cpu=()=>{let best=null,bs=-1e9;
-  b.forEach((p,i)=>{if(!p||col(p)!=="b")return;lf(b,i).forEach(j=>{const nb=promo(b,i,j);let worst=ev(nb);
-   nb.forEach((q,a)=>{if(q&&col(q)==="w")gen(nb,a).forEach(c=>{const v=ev(promo(nb,a,c));if(v<worst)worst=v})});
-   let sc=worst+Math.random()*12;if(inChk(nb,"w")&&!anyL(nb,"w"))sc+=5000;if(sc>bs){bs=sc;best=[i,j]}})});
-  if(best)mv(best[0],best[1])};
- const render=()=>{
-  const chk=!over&&inChk(b,turn);
-  setS(over||(turn==="w"?(chk?"Check! Your move":"Your move (white)"):"Computer is thinking…"));
-  box.innerHTML=`<div class="cb">${b.map((p,i)=>{const dark=((i>>3)+(i&7))%2,hl=i===sel?"inset 0 0 0 4px #0f9d73":last&&last.includes(i)?"inset 0 0 0 3px rgba(232,164,0,.85)":"",w=p&&isW(p);
-   return `<button data-s="${i}" style="background:${dark?"#b58863":"#eed9b6"};${hl?`box-shadow:${hl};`:""}"><span style="color:${w?"#fff":"#111"};text-shadow:${w?"0 0 3px #000,0 0 1px #000":"0 0 1px #888"}">${p?GL[p.toLowerCase()]+"\uFE0E":""}</span>${legal.includes(i)?'<i class="dt"></i>':""}</button>`}).join("")}</div><button class="ghost" data-newg>New game</button><small>You play white. No castling or en passant; pawns promote to queens.</small>`};
- const reset=()=>{b=[];for(const ch of FEN){if(ch>="1"&&ch<="8"){for(let n=0;n<+ch;n++)b.push("")}else b.push(ch)}turn="w";sel=null;legal=[];over="";last=null;render()};
- box.onclick=e=>{const bt=e.target.closest("button");if(!bt)return;const dd=bt.dataset;
-  if("newg" in dd){reset();return}
-  if(dd.s===undefined||over||turn!=="w")return;const i=+dd.s;
-  if(sel!==null&&legal.includes(i)){mv(sel,i);sel=null;legal=[];render();if(!over)setTimeout(()=>{if(!alive)return;cpu();render()},300);return}
-  if(b[i]&&col(b[i])==="w"){sel=i;legal=lf(b,i)}else{sel=null;legal=[]}
-  render()};
- gstop=()=>{alive=false;box.onclick=null};
- reset();
-}
-
-function gTtt(box,setS){
- const L=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
- let b,turn,two=false,w={x:0,o:0,d:0};
- const win=bd=>{for(const[a,c,e]of L)if(bd[a]&&bd[a]===bd[c]&&bd[a]===bd[e])return bd[a];return bd.every(Boolean)?"d":""};
- const mm=(bd,p)=>{const r=win(bd);if(r)return r==="o"?1:r==="x"?-1:0;let best=p==="o"?-2:2;
-  for(let i=0;i<9;i++)if(!bd[i]){bd[i]=p;const v=mm(bd,p==="o"?"x":"o");bd[i]="";best=p==="o"?Math.max(best,v):Math.min(best,v)}return best};
- const cpu=()=>{const em=[...Array(9).keys()].filter(i=>!b[i]);if(Math.random()<.2)return em[Math.floor(Math.random()*em.length)];
-  let bv=-2,bm=[];for(const i of em){b[i]="o";const v=mm(b,"x");b[i]="";if(v>bv){bv=v;bm=[i]}else if(v===bv)bm.push(i)}return bm[Math.floor(Math.random()*bm.length)]};
- const render=()=>{const r=win(b);
-  box.innerHTML=`<div class="ttt">${b.map((v,i)=>`<button data-c="${i}" ${v||r?"disabled":""}>${v?v.toUpperCase():""}</button>`).join("")}</div><b>${r==="d"?"It’s a draw":r?(two?r.toUpperCase()+" wins!":r==="x"?"You win! 🎉":"Computer wins"):(two?turn.toUpperCase()+"’s turn":"Your turn (X)")}</b><div class="row" style="width:min(100%,300px)"><button class="ghost" data-tn>New game</button><button class="ghost" data-tm>${two?"Play the computer":"Two players"}</button></div>`;
-  setS(two?`X ${w.x} · O ${w.o} · Draws ${w.d}`:`You ${w.x} · Computer ${w.o} · Draws ${w.d}`)};
- const reset=()=>{b=Array(9).fill("");turn="x";render()};
- box.onclick=e=>{const bt=e.target.closest("button");if(!bt)return;const d=bt.dataset;
-  if("tn" in d)return reset();
-  if("tm" in d){two=!two;w={x:0,o:0,d:0};return reset()}
-  if(d.c===undefined||win(b))return;const i=+d.c;if(b[i])return;
-  b[i]=turn;turn=turn==="x"?"o":"x";
-  if(!two&&!win(b)&&turn==="o"){b[cpu()]="o";turn="x"}
-  const r=win(b);if(r)w[r]++;render()};
- gstop=()=>{box.onclick=null};
- reset();
-}
-
 // ---- types and evolutions
 const TYPES=["normal","fire","water","electric","grass","ice","fighting","poison","ground","flying","psychic","bug","rock","ghost","dragon","dark","steel","fairy"],
  TCOL={normal:"#9a9a82",fire:"#e8602c",water:"#4a8de8",electric:"#d9a900",grass:"#4caf50",ice:"#58c6d1",fighting:"#c03028",poison:"#a040a0",ground:"#c9a54a",flying:"#8a7be0",psychic:"#f85888",bug:"#8fa818",rock:"#a8903a",ghost:"#705898",dragon:"#6f35fc",dark:"#6a5648",steel:"#8e8ea8",fairy:"#e87ca0"};
 const tb=t=>`<span class="rar" style="background:${TCOL[t]||"#888"}">${esc(t)}</span>`,tbs=a=>(a||[]).map(tb).join(""),typeOpts=()=>TYPES.map(t=>`<option>${t}</option>`).join("");
-// status effects shown in battles
-const SEM={poison:"☠️",burn:"🔥",paralysis:"⚡",sleep:"💤",freeze:"🧊"},SCOL={poison:"#a040a0",burn:"#e8602c",paralysis:"#d9a900",sleep:"#6b678a",freeze:"#58c6d1"},
- AUTO={fire:"burn",poison:"poison",electric:"paralysis",ice:"freeze",psychic:"sleep",grass:"sleep"};
-const stOf=k=>{if(!k||!k.id||k.st==="none"||k.heal>0)return null;if(SEM[k.st])return{s:k.st,c:k.sc>0?k.sc:30};const a=AUTO[k.type||"normal"];return a?{s:a,c:20}:null};
-const stTag=k=>{const s=stOf(k);return s?` · ${SEM[s.s]} ${s.c}%`:""};
-const stCur=f=>f.team&&f.team[f.cur];
-const stBadge=f=>{const c=stCur(f),s=c&&c.st;return s?`<span class="rar" style="background:${SCOL[s]}">${SEM[s]} ${s}</span>`:""};
-const stCls=f=>{const c=stCur(f);return c&&c.st?" st-"+c.st:""};
 let evc=null;
 function openEvo(id){const c=cats[id];if(!c)return;evc=c;const cur=c.evo||{lvl:16,to:[]};
  $("#evbody").innerHTML=`<b>${esc(c.name)} evolves…</b><label>At level<input id="evlvl" type="number" min="2" max="100" value="${cur.lvl}"></label><b>Into (tick several for a choice, up to 10)</b>`
