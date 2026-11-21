@@ -35,8 +35,8 @@ try{db.exec("ALTER TABLE items ADD COLUMN po INTEGER DEFAULT 0")}catch(e){}
 try{db.exec("ALTER TABLE moves ADD COLUMN po INTEGER DEFAULT 0")}catch(e){}
 try{db.exec("ALTER TABLE moves ADD COLUMN heal INTEGER DEFAULT 0")}catch(e){}
 try{db.exec("ALTER TABLE players ADD COLUMN tw TEXT DEFAULT '[]'")}catch(e){}
-try{db.exec("ALTER TABLE players ADD COLUMN ign TEXT DEFAULT '[]'")}catch(e){}
 db.exec("CREATE TABLE IF NOT EXISTS wilds(id INTEGER PRIMARY KEY AUTOINCREMENT,cat INTEGER,lvl INTEGER DEFAULT 5,reward INTEGER DEFAULT 0,hidden INTEGER DEFAULT 0)");
+try{db.exec("ALTER TABLE wilds ADD COLUMN moves TEXT DEFAULT '[]'")}catch(e){}
 db.exec("CREATE TABLE IF NOT EXISTS trainers(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,img TEXT DEFAULT '',team TEXT DEFAULT '[]',reward INTEGER DEFAULT 0,hidden INTEGER DEFAULT 0)");
 db.exec("CREATE TABLE IF NOT EXISTS packs(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,emoji TEXT DEFAULT '',price INTEGER DEFAULT 0,stock INTEGER DEFAULT -1,chances TEXT DEFAULT '{}',contents TEXT DEFAULT '[]',filler TEXT DEFAULT '')");
 try{db.exec("ALTER TABLE packs ADD COLUMN hidden INTEGER DEFAULT 0")}catch(e){}
@@ -255,7 +255,13 @@ const doMove=(x,side,m)=>{
    if(defeated(me)){finish(x,o.pid);return}
    x.turn=os;x.need=side;return}}
  x.turn=os};
-const npcMove=x=>{const at=x.b.team[x.b.cur],t=at.t[0]||"normal";return Math.random()<.5?SCRATCH:{id:-1,name:t[0].toUpperCase()+t.slice(1)+" strike",damage:14,anim:TANIM[t]||"slash",type:t}};
+const pickMoves=ids=>[...new Set((Array.isArray(ids)?ids:[]).map(x=>parseInt(x)))].filter(id=>q("SELECT 1 FROM moves WHERE id=? AND owner=''").get(id)).slice(0,4);
+const npcMove=x=>{const at=x.b.team[x.b.cur],t=at.t[0]||"normal",any=a=>a[Math.floor(Math.random()*a.length)],
+ rows=(at.mv||[]).map(id=>q("SELECT * FROM moves WHERE id=?").get(id)).filter(Boolean);
+ if(rows.length){const heals=rows.filter(m=>m.heal>0),atk=rows.filter(m=>!(m.heal>0));
+  if(heals.length&&at.hp<at.max*.5&&Math.random()<.6)return any(heals);
+  return any(atk.length?atk:rows)}
+ return Math.random()<.5?SCRATCH:{id:-1,name:t[0].toUpperCase()+t.slice(1)+" strike",damage:14,anim:TANIM[t]||"slash",type:t}};
 const autoSwitch=x=>{const s=x.b,i=s.team.findIndex((c,k)=>c.hp>0&&k!==s.cur);if(i>=0){s.cur=i;s.team[i].used=true;sync(s);x.log=[...x.log,`${s.name} sent out ${s.cat.name}!`].slice(-8)}x.need=null};
 const afterAct=x=>{if(!x.npc)return;for(let n=0;n<40&&x.state==="active";n++){if(x.need==="b"){autoSwitch(x);continue}if(x.turn==="b"&&!x.need)doMove(x,"b",npcMove(x));else break}};
 const actions={
@@ -398,21 +404,21 @@ const actions={
   let team,tag,name,reward=0,img="",tid=0,wild=0;
   if(b.kind==="wild"){const w=q("SELECT * FROM wilds WHERE id=?").get(parseInt(b.id));if(!w||w.hidden)bad("That wild cat ran away");
    const c=q("SELECT * FROM cats WHERE id=?").get(w.cat);if(!c)bad("That wild cat ran away");
-   team=[{c,lv:w.lvl}];tag="Wild";name="Wild "+c.name;reward=w.reward;wild=1}
+   team=[{c,lv:w.lvl,mv:JSON.parse(w.moves||"[]")}];tag="Wild";name="Wild "+c.name;reward=w.reward;wild=1}
   else if(b.kind==="trainer"){const t=q("SELECT * FROM trainers WHERE id=?").get(parseInt(b.id));if(!t||t.hidden)bad("That trainer left");
-   team=JSON.parse(t.team||"[]").map(e=>({c:q("SELECT * FROM cats WHERE id=?").get(e.cat),lv:e.lvl})).filter(e=>e.c);if(!team.length)bad("That trainer has no cats");
+   team=JSON.parse(t.team||"[]").map(e=>({c:q("SELECT * FROM cats WHERE id=?").get(e.cat),lv:e.lvl,mv:e.moves||[]})).filter(e=>e.c);if(!team.length)bad("That trainer has no cats");
    name=t.name;tag=t.name+"’s";tid=t.id;img=t.img?`/img/trainer/${t.id}?v=${iv(t.img)}`:"";
    reward=JSON.parse(p.tw||"[]").includes(t.id)?0:t.reward}
   else bad("Pick a wild cat or a trainer");
   const lead=mine0.includes(parseInt(b.cat))?parseInt(b.cat):mine0[0],mine=mkTeam(p,lead);
-  const npc=sync({pid:"~npc",name,tag,cur:0,team:team.map(({c,lv},i)=>{const mx=hpAt(c.hp,lv);return{id:c.id,name:c.name,img:c.img?`/img/cat/${c.id}?v=${iv(c.img)}`:"",max:mx,hp:mx,lvl:lv,t:[c.t1||"normal",c.t2||""].filter(Boolean),used:i===0,st:"",sl:0}})});
+  const npc=sync({pid:"~npc",name,tag,cur:0,team:team.map(({c,lv,mv},i)=>{const mx=hpAt(c.hp,lv);return{id:c.id,name:c.name,img:c.img?`/img/cat/${c.id}?v=${iv(c.img)}`:"",max:mx,hp:mx,lvl:lv,t:[c.t1||"normal",c.t2||""].filter(Boolean),used:i===0,st:"",sl:0,mv:mv||[]}})});
   battles.set(++bid,{id:bid,state:"active",bet:0,pot:0,need:null,npc:1,wild,tid,reward,timg:img,a:mine,b:npc,turn:"a",n:0,last:null,log:[wild?`A wild ${team[0].c.name} appeared!`:`${name} wants to battle!`],ts:Date.now()})},
  "wild/add"(p,b){adm(p);const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.cat));if(!c||c.owner)bad("Pick a cat");
   const lvl=parseInt(b.lvl);if(!(lvl>=1&&lvl<=MAXLV))bad(`Level must be 1 to ${MAXLV}`);
-  q("INSERT INTO wilds(cat,lvl,reward) VALUES(?,?,?)").run(c.id,lvl,Math.min(1e6,Math.max(0,parseInt(b.reward)||0)))},
+  q("INSERT INTO wilds(cat,lvl,reward,moves) VALUES(?,?,?,?)").run(c.id,lvl,Math.min(1e6,Math.max(0,parseInt(b.reward)||0)),JSON.stringify(pickMoves(b.moves)))},
  "wild/remove"(p,b){adm(p);q("UPDATE wilds SET hidden=1 WHERE id=?").run(parseInt(b.id))},
  "trainer/add"(p,b){adm(p);const name=String(b.name||"").trim().slice(0,30);if(!name)bad("Give the trainer a name");
-  const team=(Array.isArray(b.team)?b.team:[]).slice(0,6).map(e=>({cat:parseInt(e&&e.cat),lvl:Math.min(MAXLV,Math.max(1,parseInt(e&&e.lvl)||1))})).filter(e=>q("SELECT 1 FROM cats WHERE id=?").get(e.cat));
+  const team=(Array.isArray(b.team)?b.team:[]).slice(0,6).map(e=>({cat:parseInt(e&&e.cat),lvl:Math.min(MAXLV,Math.max(1,parseInt(e&&e.lvl)||1)),moves:pickMoves(e&&e.moves)})).filter(e=>q("SELECT 1 FROM cats WHERE id=?").get(e.cat));
   if(!team.length)bad("Pick at least one cat for the trainer");
   q("INSERT INTO trainers(name,img,team,reward) VALUES(?,?,?,?)").run(name,imgOk(b.img),JSON.stringify(team),Math.min(1e6,Math.max(0,parseInt(b.reward)||0)))},
  "trainer/remove"(p,b){adm(p);q("UPDATE trainers SET hidden=1 WHERE id=?").run(parseInt(b.id))},
@@ -496,9 +502,29 @@ const actions={
   if(!list.length)bad("Tick at least one prize for the pack");
   const ch={};for(const[k,v]of Object.entries(b.chances||{}).slice(0,12)){const n=parseFloat(v);if(n>0)ch[String(k).slice(0,20)]=Math.min(100,n)}
   q("INSERT INTO packs(name,emoji,price,stock,chances,contents,filler) VALUES(?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",price,st>0?st:-1,JSON.stringify(ch),JSON.stringify(list),f?JSON.stringify(f):"")},
- "shop/ignore"(p,b){const k=String(b.k||"");if(!/^[icpm]:\d{1,9}$/.test(k))bad("Can’t ignore that");
-  let l=JSON.parse(p.ign||"[]").filter(x=>x!==k);if(b.on)l.push(k);if(l.length>300)l=l.slice(-300);
-  q("UPDATE players SET ign=? WHERE id=?").run(JSON.stringify(l),p.id)},
+ "shop/delete"(p,b){adm(p);const id=parseInt(b.id),T=String(b.kind);if(!Object.hasOwn(RK,T))bad("Unknown kind");
+  if(!q(`SELECT 1 FROM ${RK[T]} WHERE id=?`).get(id))bad("That is already gone");
+  const all=q("SELECT * FROM players").all();
+  if(T==="item"){for(const pl of all){const inv=JSON.parse(pl.inv||"{}");if(inv[id]){delete inv[id];q("UPDATE players SET inv=? WHERE id=?").run(JSON.stringify(inv),pl.id)}}
+   for(const[k,x]of trades)if(x.give.items[id]||x.want.items[id])trades.delete(k)}
+  else if(T==="move"){
+   for(const pl of all){const mv=JSON.parse(pl.moves||"[]");if(!mv.includes(id))continue;let eq=pl.eq,em=pl.eqc;
+    if(eq!=null)eq=JSON.stringify(JSON.parse(eq).filter(v=>v!==id));
+    if(em!=null){const m=JSON.parse(em);for(const c of Object.keys(m)){m[c]=m[c].filter(v=>v!==id);if(!m[c].length)m[c]=[0]}em=JSON.stringify(m)}
+    q("UPDATE players SET moves=?,eq=?,eqc=? WHERE id=?").run(JSON.stringify(mv.filter(v=>v!==id)),eq,em,pl.id)}
+   for(const w of q("SELECT id,moves FROM wilds").all()){const l=JSON.parse(w.moves||"[]");if(l.includes(id))q("UPDATE wilds SET moves=? WHERE id=?").run(JSON.stringify(l.filter(v=>v!==id)),w.id)}
+   for(const t of q("SELECT id,team FROM trainers").all()){const tm=JSON.parse(t.team||"[]");if(tm.some(e=>(e.moves||[]).includes(id)))q("UPDATE trainers SET team=? WHERE id=?").run(JSON.stringify(tm.map(e=>({...e,moves:(e.moves||[]).filter(v=>v!==id)}))),t.id)}}
+  else if(T==="cat"){
+   for(const pl of all){const cs=JSON.parse(pl.cats||"[]");if(!cs.includes(id))continue;const cx=JSON.parse(pl.cx||"{}");delete cx[id];let em=pl.eqc;if(em!=null){const m=JSON.parse(em);delete m[id];em=JSON.stringify(m)}
+    q("UPDATE players SET cats=?,cx=?,eqc=? WHERE id=?").run(JSON.stringify(cs.filter(v=>v!==id)),JSON.stringify(cx),em,pl.id)}
+   q("DELETE FROM wilds WHERE cat=?").run(id);
+   for(const t of q("SELECT id,team FROM trainers").all()){const tm=JSON.parse(t.team||"[]"),n=tm.filter(e=>e.cat!==id);if(n.length===tm.length)continue;if(n.length)q("UPDATE trainers SET team=? WHERE id=?").run(JSON.stringify(n),t.id);else q("DELETE FROM trainers WHERE id=?").run(t.id)}
+   for(const c of q("SELECT id,evo FROM cats").all()){const ev=evoOf(c);if(ev&&ev.to.includes(id)){const to=ev.to.filter(v=>v!==id);q("UPDATE cats SET evo=? WHERE id=?").run(to.length?JSON.stringify({lvl:ev.lvl,to}):"",c.id)}}
+   for(const[k,x]of trades)if(x.give.cats.includes(id)||x.want.cats.includes(id))trades.delete(k)}
+  if(T==="item"||T==="cat"||T==="move")for(const k of q("SELECT id,contents,filler FROM packs").all()){
+   const c=JSON.parse(k.contents||"[]"),n=c.filter(e=>!(e.t===T&&e.id===id)),f=k.filler?JSON.parse(k.filler):null,nf=f&&f.t===T&&f.id===id?"":k.filler;
+   if(n.length!==c.length||nf!==k.filler)q("UPDATE packs SET contents=?,filler=? WHERE id=?").run(JSON.stringify(n),nf,k.id)}
+  q(`DELETE FROM ${RK[T]} WHERE id=?`).run(id)},
  "pack/remove"(p,b){adm(p);q("UPDATE packs SET hidden=1 WHERE id=?").run(parseInt(b.id))},
  "pack/buy"(p,b){const k=q("SELECT * FROM packs WHERE id=?").get(parseInt(b.id));if(!k||k.hidden)bad("That pack is gone");
   if(k.stock===0)bad("Sold out");if(!inf(p)&&p.coins<k.price)bad("Not enough coins");
@@ -555,12 +581,12 @@ const snapshot=()=>{const on=new Set([...clients].map(c=>c.pid));return JSON.str
  cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,price:c.price||0,owner:c.owner||"",rarity:c.rarity||"",po:!!c.po,t:[c.t1||"normal",c.t2||""].filter(Boolean),evo:evoOf(c),listed:!c.hidden,img:c.img?`/img/cat/${c.id}?v=${iv(c.img)}`:""})),
  moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,owner:k.owner||"",rarity:k.rarity||"",type:k.type||"normal",st:k.st||"",sc:k.sc||0,po:!!k.po,heal:k.heal||0,listed:!k.hidden,fx:fxInfo(k)})),
  packs:snapPacks(),
- wilds:q("SELECT * FROM wilds").all().map(w=>({id:w.id,cat:w.cat,lvl:w.lvl,reward:w.reward,listed:!w.hidden})),
+ wilds:q("SELECT * FROM wilds").all().map(w=>({id:w.id,cat:w.cat,lvl:w.lvl,reward:w.reward,moves:JSON.parse(w.moves||"[]"),listed:!w.hidden})),
  trainers:q("SELECT * FROM trainers").all().map(t=>({id:t.id,name:t.name,reward:t.reward,team:JSON.parse(t.team||"[]"),listed:!t.hidden,img:t.img?`/img/trainer/${t.id}?v=${iv(t.img)}`:""})),
  messages:q("SELECT * FROM (SELECT id,name,text,ts,sys,img!='' AS hasimg FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all(),
  news:q("SELECT id,title,body,text,ts,author,img!='' AS hi FROM news ORDER BY id DESC LIMIT 30").all()})};
 function sendTo(c,base){const m=find(c.pid);if(!m)return;const cxm=JSON.parse(m.cx||"{}");
- c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),tw:JSON.parse(m.tw||"[]"),ign:JSON.parse(m.ign||"[]"),daily:m.daily,moves:JSON.parse(m.moves||"[]"),eq:equipped(m),scratch:!m.noscratch,lv:Object.fromEntries(JSON.parse(m.cats||"[]").map(id=>{const c=q("SELECT hp FROM cats WHERE id=?").get(id),pg=prog(cxm[id]||0);return[id,{...pg,hp:c?hpAt(c.hp,pg.lvl):0}]})),eqc:eqMap(m),battle:inBattle(m.id)||null,trades:[...trades.values()].filter(x=>x.from===m.id||x.to===m.id).map(({id,from,to,give,want})=>({id,from,to,give,want})),blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined,notes:q("SELECT id,text FROM notes WHERE pid=? ORDER BY id").all(m.id),words:m.admin?q("SELECT w FROM badwords ORDER BY w").all().map(r=>r.w):undefined})+"}\n\n")}
+ c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),tw:JSON.parse(m.tw||"[]"),daily:m.daily,moves:JSON.parse(m.moves||"[]"),eq:equipped(m),scratch:!m.noscratch,lv:Object.fromEntries(JSON.parse(m.cats||"[]").map(id=>{const c=q("SELECT hp FROM cats WHERE id=?").get(id),pg=prog(cxm[id]||0);return[id,{...pg,hp:c?hpAt(c.hp,pg.lvl):0}]})),eqc:eqMap(m),battle:inBattle(m.id)||null,trades:[...trades.values()].filter(x=>x.from===m.id||x.to===m.id).map(({id,from,to,give,want})=>({id,from,to,give,want})),blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined,notes:q("SELECT id,text FROM notes WHERE pid=? ORDER BY id").all(m.id),words:m.admin?q("SELECT w FROM badwords ORDER BY w").all().map(r=>r.w):undefined})+"}\n\n")}
 function broadcast(){if(!clients.size)return;const base=snapshot();for(const c of clients)sendTo(c,base)}
 function push(){scheduleSave();broadcast()}
 setInterval(()=>{for(const c of clients)c.res.write(": ping\n\n")},25000);
