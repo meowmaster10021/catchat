@@ -51,7 +51,7 @@ h2{margin:.2rem 0;font-size:1.05rem}
 #toast{position:fixed;left:50%;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.5em 1em;border-radius:10px;display:none;z-index:9}
 .tag{font-size:.75rem;background:var(--coin);color:#2b1d00;border-radius:6px;padding:0 .4em;margin-left:.3em}
 body[data-tab=chat] #p-chat{display:flex;flex-direction:column}
-body[data-tab=shop] #p-shop,body[data-tab=battle] #p-battle,body[data-tab=trade] #p-trade,body[data-tab=wallet] #p-wallet,body[data-tab=settings] #p-settings,body[data-tab=admin] #p-admin{display:grid}
+body[data-tab=shop] #p-shop,body[data-tab=apps] #p-apps,body[data-tab=news] #p-news,body[data-tab=arcade] #p-arcade,body[data-tab=battle] #p-battle,body[data-tab=trade] #p-trade,body[data-tab=wallet] #p-wallet,body[data-tab=settings] #p-settings,body[data-tab=admin] #p-admin{display:grid}
 .mw{display:flex;gap:.5rem;align-items:flex-end;max-width:92%}
 .mw.me{align-self:flex-end;flex-direction:row-reverse}
 .av{width:36px;height:36px;border-radius:50%;flex:none;background:var(--line);object-fit:cover;overflow:visible}
@@ -102,6 +102,9 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
 .r-common{background:#8a87ab}.r-uncommon{background:#1fa463}.r-rare{background:#2f7fd6}.r-epic{background:#8e5bd9}.r-legendary{background:#e8a400;color:#2b1d00}
 .tm{display:flex;justify-content:center;gap:2px;font-size:.8rem}.tm .dn{opacity:.25;filter:grayscale(1)}.tm .cu{outline:2px solid var(--accent);border-radius:50%}
 #mkbody{display:grid;gap:.5rem}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:.9rem}
+.app{aspect-ratio:1;border-radius:22px;background:var(--panel);color:var(--ink);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.35rem;padding:.3rem}
+.app b{font-size:2.6rem;line-height:1}.app span{font-size:.85rem;font-weight:600}
 </style>
 </head>
 <body data-tab="chat" data-side="shop">
@@ -127,6 +130,9 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
   <section class="pane scroll" id="p-wallet"></section>
   <section class="pane scroll" id="p-settings"></section>
   <section class="pane scroll" id="p-admin"></section>
+  <section class="pane scroll" id="p-apps"><div class="apps"><button class="app" data-app="battle"><b>⚔️</b><span>Battle</span></button><button class="app" data-app="trade"><b>🔁</b><span>Trade</span></button><button class="app" data-app="news"><b>📰</b><span>News</span></button><button class="app" data-app="arcade"><b>🕹️</b><span>Arcade</span></button></div></section>
+  <section class="pane scroll" id="p-news"></section>
+  <section class="pane scroll" id="p-arcade"></section>
  </main>
 </div>
 <dialog id="dlg"><canvas id="cv" width="160" height="160"></canvas><div class="sw" id="dsw" style="margin-bottom:.5rem"></div>
@@ -157,7 +163,8 @@ const odds=k=>{const ks=Object.keys(k.chances||{}).filter(r=>k.chances[r]>0),S=k
  if(!ks.length)return f?"Always "+esc(f.name):"Equal chance for every prize";
  return ks.map(r=>`${lab(r)} ${n(100*k.chances[r]/(f?100:S))}%`).join(" ")+(f&&S<100?` · ${esc(f.name)} ${n(100-S)}%`:"")};
 const rarSel=`<input name="rarity" list="rarlist" placeholder="Rarity (optional, type anything)" maxlength="20" autocomplete="off">`,poBox=`<label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" name="po" style="width:auto">Only in packs (not sold alone)</label>`;
-let meId=null,players={},items={},cats={},moves={},packs={},msgs=[],tab="chat",started=false;
+let meId=null,players={},items={},cats={},moves={},packs={},msgs=[],news=[],tab="chat",started=false;
+const APPS=["battle","trade","news","arcade"];
 const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 const me=()=>players[meId], isAdmin=()=>!!(me()&&me().admin);
 const FUR=["#f2a65a","#8d8d9b","#2f2f3a","#f4efe6","#c98a5b","#e8c9a0","#7aa7c7","#d6a6e0"],EYE=["#4cc38a","#f5c542","#4aa3ff","#ff8a5c","#b07cff"],PAT=["plain","stripes","patch","muzzle"],ACC=["none","bow","crown","glasses","hat"];
@@ -218,16 +225,16 @@ function start(){
   if(players[meId])Object.assign(players[meId],d.me);
   items={};d.items.forEach(i=>items[i.id]=i);
   cats={};(d.cats||[]).forEach(c=>cats[c.id]=c);moves={};(d.moves||[]).forEach(k=>moves[k.id]=k);packs={};(d.packs||[]).forEach(k=>packs[k.id]=k);preload();
-  msgs=d.messages;renderAll();
+  msgs=d.messages;news=d.news||[];renderAll();
  });
  es.addEventListener("bye",ev=>{logoutLocal();showLogin(ev.data==="banned"?"Your account was banned.":"Your account was deleted.")});
  es.onerror=()=>{if(es&&es.readyState===2){logoutLocal();showLogin("Session expired. Log in again.")}};
- setTab("chat");
+ setTab("chat");arcMenu();
 }
 function setTab(t){
- tab=t;document.body.dataset.tab=t;
- const tabs=[["chat","Chat"],["shop","Shop"],["battle","Battle"],["trade","Trade"],["wallet","Wallet"],["settings","Settings"]];if(isAdmin())tabs.push(["admin","Admin"]);
- $("#nav").innerHTML=tabs.map(([k,l])=>`<button class="${t===k?"on":""}" data-t="${k}">${l}</button>`).join("");
+ tab=t;document.body.dataset.tab=t;if(t!=="arcade"&&ag){stopGame();arcMenu()}
+ const tabs=[["chat","Chat"],["shop","Shop"],["apps","Apps"],["wallet","Wallet"],["settings","Settings"]];if(isAdmin())tabs.push(["admin","Admin"]);
+ $("#nav").innerHTML=tabs.map(([k,l])=>`<button class="${(APPS.includes(t)?"apps":t)===k?"on":""}" data-t="${k}">${l}</button>`).join("");
 }
 $("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)setTab(t)};
 addEventListener("resize",()=>meId&&setTab(tab));
@@ -237,7 +244,7 @@ function renderAll(){
  if(!me())return;
  $("#bal").textContent="🪙 "+(me().inf?"∞":me().coins);
  if(!isAdmin()&&tab==="admin")tab="shop";
- setTab(tab);renderPop();renderChat();renderShop();renderBattle();renderTrade();renderWallet();renderSettings();renderAdmin();
+ setTab(tab);renderPop();renderChat();renderShop();renderBattle();renderTrade();renderNews();renderWallet();renderSettings();renderAdmin();
 }
 function renderChat(){
  const l=$("#log"),stick=l.scrollHeight-l.scrollTop-l.clientHeight<80;
@@ -619,6 +626,126 @@ $("#evdlg").onclick=async e=>{const b=e.target.closest("button");if(!b||!evc)ret
  }catch(x){}
 };
 document.addEventListener("click",e=>{const k=e.target.dataset&&e.target.dataset.clrimg;if(k){setImg(k,"");document.querySelectorAll(`[data-img="${k}"]`).forEach(x=>x.value="")}});
+// ---- apps grid, news
+$("#p-apps").onclick=e=>{const b=e.target.closest("[data-app]");if(b)setTab(b.dataset.app)};
+function renderNews(){
+ const box=$("#p-news"),a=isAdmin();
+ if(!$("#nlist"))box.innerHTML='<div id="nform"></div><div id="nlist" style="display:grid;gap:.7rem"></div>';
+ const f=$("#nform");
+ if(a&&!f.firstChild)f.innerHTML=`<form id="nf" class="card" style="display:grid;gap:.5rem"><input name="title" placeholder="Headline" required maxlength="80"><textarea name="body" placeholder="What’s new?" rows="3" maxlength="1000" required></textarea><button>Post news</button></form>`;
+ else if(!a)f.innerHTML="";
+ $("#nlist").innerHTML=news.map(n=>`<div class="card" style="display:grid;gap:.3rem"><b>${esc(n.title)}</b><div style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(n.body)}</div><small>${esc(n.name)} · ${new Date(n.ts).toLocaleDateString()}</small>${a?`<button class="bad" data-nrm="${n.id}">Delete</button>`:""}</div>`).join("")||'<div class="empty">No news yet.</div>';
+}
+$("#p-news").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await api("news/add",{title:f.get("title"),body:f.get("body")});e.target.reset();toast("News posted")}catch(x){}};
+$("#p-news").onclick=async e=>{const id=e.target.dataset.nrm;if(id&&isAdmin())try{await api("news/remove",{id})}catch(x){}};
+
+// ---- arcade: chess (win = 100 coins), tetris and snake (half your points). The server decides the payout.
+const ARC=[["chess","♟️","Chess","Beat the computer to win 100 coins."],["tetris","🧱","Tetris","You get half your points as coins."],["snake","🐍","Snake","You get half your points as coins."]];
+let ag=null,agk="";
+const stopGame=()=>{if(ag){try{ag.stop()}catch(x){}ag=null}};
+const gs=s=>{const e=$("#gscore");if(e)e.textContent="Score "+s};
+function arcMenu(){stopGame();$("#p-arcade").innerHTML=`<h2>Arcade</h2><div class="apps">${ARC.map(a=>`<button class="app" data-g="${a[0]}"><b>${a[1]}</b><span>${a[2]}</span></button>`).join("")}</div>${ARC.map(a=>`<small style="color:var(--mute)">${a[1]} ${a[2]}: ${a[3]}</small>`).join("")}`}
+function openGame(k){stopGame();agk=k;const g=ARC.find(a=>a[0]===k);
+ $("#p-arcade").innerHTML=`<div class="row" style="align-items:center;flex-wrap:nowrap"><button class="ghost" data-g="menu" style="flex:none">← Games</button><b style="flex:1">${g[1]} ${g[2]}</b><span class="price" id="gscore" style="flex:none"></span></div><small style="color:var(--mute)">${g[3]}</small><div id="garea" style="display:grid;gap:.6rem;justify-items:center"><button data-ga="start">Start game</button></div>`}
+const padHTML=k=>k==="chess"?`<button class="ghost" data-ga="resign">Resign</button>`:`<div style="display:grid;grid-template-columns:repeat(${k==="tetris"?5:4},1fr);gap:.4rem;width:min(92vw,340px)">${k==="snake"?'<button class="ghost" data-ga="l">◀</button><button class="ghost" data-ga="u">▲</button><button class="ghost" data-ga="d">▼</button><button class="ghost" data-ga="r">▶</button>':'<button class="ghost" data-ga="l">◀</button><button class="ghost" data-ga="u">⟳</button><button class="ghost" data-ga="r">▶</button><button class="ghost" data-ga="d">▼</button><button class="ghost" data-ga="drop">⤓</button>'}</div>`;
+async function startGame(){
+ try{await api("arcade/start",{game:agk})}catch(x){return}
+ $("#garea").innerHTML=`<div id="gcv"></div><div id="gmsg" style="min-height:1.3em;text-align:center"></div>${padHTML(agk)}`;
+ ag=({chess:chessGame,tetris:tetrisGame,snake:snakeGame})[agk]($("#gcv"),endGame);
+}
+async function endGame(r){
+ const k=agk;stopGame();let msg="";
+ try{const j=await api("arcade/finish",{game:k,...r}),x=j.res||{};
+  msg=(r.text?r.text+" ":"")+(k==="chess"?"":`${x.pts} points. `)+(x.reward?`+${x.reward} coins! 🪙`:"No coins this time.")+(x.capped?" Daily arcade limit reached.":"")}
+ catch(e){msg="Couldn’t save that game."}
+ const m=$("#gmsg");if(m)m.innerHTML=`<b>${esc(msg)}</b>`;
+ const a=$("#garea");if(a&&!a.querySelector("[data-ga=start]")){const b=document.createElement("button");b.dataset.ga="start";b.textContent="Play again";a.appendChild(b)}
+}
+$("#p-arcade").onclick=e=>{const b=e.target.closest("button");if(!b)return;const d=b.dataset;
+ if(d.g==="menu")arcMenu();else if(d.g)openGame(d.g);
+ else if(d.ga==="start")startGame();
+ else if(d.ga==="resign"){if(ag&&ag.resign)ag.resign()}
+ else if(d.ga&&ag&&ag.key)ag.key(d.ga)};
+document.addEventListener("keydown",e=>{if(!ag||tab!=="arcade"||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;
+ const m={ArrowLeft:"l",a:"l",ArrowRight:"r",d:"r",ArrowUp:"u",w:"u",ArrowDown:"d",s:"d"," ":"drop"}[e.key];if(m&&ag.key){e.preventDefault();ag.key(m)}});
+
+function snakeGame(area,done){
+ const N=16,cv=document.createElement("canvas");cv.width=cv.height=320;cv.style.cssText="width:min(92vw,320px);height:auto;aspect-ratio:1;border:1px solid var(--line);border-radius:10px;background:var(--panel);display:block";area.appendChild(cv);
+ const c=cv.getContext("2d");let sn=[[8,8],[7,8],[6,8]],dir=[1,0],nd=dir,score=0,over=false,timer=0,food;
+ const spot=()=>{for(;;){const f=[Math.random()*N|0,Math.random()*N|0];if(!sn.some(s=>s[0]===f[0]&&s[1]===f[1]))return f}};
+ food=spot();
+ const draw=()=>{c.clearRect(0,0,320,320);c.fillStyle="#e8a400";c.beginPath();c.arc(food[0]*20+10,food[1]*20+10,7,0,7);c.fill();sn.forEach((s,i)=>{c.fillStyle=i?"#0f9d73":"#5be3b0";c.fillRect(s[0]*20+1,s[1]*20+1,18,18)})};
+ const end=()=>{if(over)return;over=true;clearTimeout(timer);done({score})};
+ const step=()=>{if(over)return;dir=nd;const h=[sn[0][0]+dir[0],sn[0][1]+dir[1]];
+  if(h[0]<0||h[1]<0||h[0]>=N||h[1]>=N||sn.slice(0,-1).some(s=>s[0]===h[0]&&s[1]===h[1]))return end();
+  sn.unshift(h);if(h[0]===food[0]&&h[1]===food[1]){score+=10;food=spot();gs(score)}else sn.pop();
+  draw();timer=setTimeout(step,Math.max(70,140-score/2))};
+ gs(0);draw();timer=setTimeout(step,500);
+ return{key(k){const m={l:[-1,0],r:[1,0],u:[0,-1],d:[0,1]}[k];if(m&&!(m[0]===-dir[0]&&m[1]===-dir[1]))nd=m},stop(){over=true;clearTimeout(timer)}}}
+
+function tetrisGame(area,done){
+ const W=10,H=20,cv=document.createElement("canvas");cv.width=200;cv.height=400;cv.style.cssText="width:min(50vw,200px);height:auto;aspect-ratio:1/2;border:1px solid var(--line);border-radius:10px;background:var(--panel);display:block";area.appendChild(cv);
+ const c=cv.getContext("2d"),SH={I:[[1,1,1,1]],O:[[1,1],[1,1]],T:[[0,1,0],[1,1,1]],S:[[0,1,1],[1,1,0]],Z:[[1,1,0],[0,1,1]],J:[[1,0,0],[1,1,1]],L:[[0,0,1],[1,1,1]]},
+  CO={I:"#4cc3d9",O:"#e8c42c",T:"#a050d0",S:"#4caf50",Z:"#e0504a",J:"#4a70e0",L:"#e88a2c"};
+ let g=Array.from({length:H},()=>Array(W).fill("")),cur=null,score=0,lines=0,over=false,timer=0;
+ const rot=m=>m[0].map((_,i)=>m.map(r=>r[i]).reverse()),fits=(m,x,y)=>m.every((r,j)=>r.every((v,i)=>!v||(x+i>=0&&x+i<W&&y+j<H&&!g[y+j][x+i]))),lvl=()=>1+Math.floor(lines/10);
+ const draw=()=>{c.clearRect(0,0,200,400);g.forEach((r,j)=>r.forEach((v,i)=>{if(v){c.fillStyle=CO[v];c.fillRect(i*20+1,j*20+1,18,18)}}));if(cur){c.fillStyle=CO[cur.k];cur.m.forEach((r,j)=>r.forEach((v,i)=>{if(v)c.fillRect((cur.x+i)*20+1,(cur.y+j)*20+1,18,18)}))}};
+ const end=()=>{if(over)return;over=true;clearTimeout(timer);draw();done({score})};
+ const spawn=()=>{const k="IOTSZJL"[Math.random()*7|0],m=SH[k];cur={k,m,x:(W-m[0].length)>>1,y:0};if(!fits(m,cur.x,0)){cur=null;end()}};
+ const lock=()=>{cur.m.forEach((r,j)=>r.forEach((v,i)=>{if(v)g[cur.y+j][cur.x+i]=cur.k}));let n=0;g=g.filter(r=>{if(r.every(v=>v)){n++;return false}return true});while(g.length<H)g.unshift(Array(W).fill(""));
+  score+=[0,100,300,500,800][n]*lvl();lines+=n;gs(score);spawn()};
+ const fall=()=>{if(!cur)return false;if(fits(cur.m,cur.x,cur.y+1)){cur.y++;return true}lock();return false};
+ const tick=()=>{if(over)return;fall();draw();if(!over)timer=setTimeout(tick,Math.max(100,700-(lvl()-1)*60))};
+ spawn();gs(0);draw();timer=setTimeout(tick,700);
+ return{key(k){if(over||!cur)return;
+  if(k==="l"&&fits(cur.m,cur.x-1,cur.y))cur.x--;
+  else if(k==="r"&&fits(cur.m,cur.x+1,cur.y))cur.x++;
+  else if(k==="d"){if(fall()){score++;gs(score)}}
+  else if(k==="u"){const m=rot(cur.m);for(const dx of[0,-1,1,-2,2])if(fits(m,cur.x+dx,cur.y)){cur.m=m;cur.x+=dx;break}}
+  else if(k==="drop"){while(fits(cur.m,cur.x,cur.y+1)){cur.y++;score+=2}lock()}
+  draw()},stop(){over=true;clearTimeout(timer)}}}
+
+// chess: you are white, the computer is black. No castling or en passant; pawns promote to queens.
+const CVAL={p:100,n:320,b:330,r:500,q:900,k:0},CG={p:"♟",n:"♞",b:"♝",r:"♜",q:"♛",k:"♚"},isW=p=>p===p.toUpperCase();
+function cpseudo(b,w){const out=[];
+ for(let i=0;i<64;i++){const p=b[i];if(!p||isW(p)!==w)continue;const r=i>>3,c=i&7,t=p.toLowerCase();
+  const add=(rr,cc)=>{if(rr<0||rr>7||cc<0||cc>7)return false;const j=rr*8+cc,q=b[j];if(q&&isW(q)===w)return false;out.push([i,j]);return !q};
+  if(t==="p"){const d=w?-1:1,st=w?6:1;
+   if(r+d>=0&&r+d<8){if(!b[(r+d)*8+c]){out.push([i,(r+d)*8+c]);if(r===st&&!b[(r+2*d)*8+c])out.push([i,(r+2*d)*8+c])}
+    for(const dc of[-1,1]){const cc=c+dc;if(cc<0||cc>7)continue;const q=b[(r+d)*8+cc];if(q&&isW(q)!==w)out.push([i,(r+d)*8+cc])}}}
+  else if(t==="n")for(const[a,e]of[[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]])add(r+a,c+e);
+  else if(t==="k"){for(let a=-1;a<2;a++)for(let e=-1;e<2;e++)if(a||e)add(r+a,c+e)}
+  else{const ds=t==="b"?[[1,1],[1,-1],[-1,1],[-1,-1]]:t==="r"?[[1,0],[-1,0],[0,1],[0,-1]]:[[1,1],[1,-1],[-1,1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+   for(const[a,e]of ds){let rr=r+a,cc=c+e;while(add(rr,cc)){rr+=a;cc+=e}}}}
+ return out}
+const capply=(b,m)=>{const n=b.slice(),p=n[m[0]];n[m[1]]=p;n[m[0]]="";if(p==="P"&&m[1]<8)n[m[1]]="Q";if(p==="p"&&m[1]>55)n[m[1]]="q";return n};
+const cinCheck=(b,w)=>{const ki=b.indexOf(w?"K":"k");return ki<0||cpseudo(b,!w).some(m=>m[1]===ki)};
+const clegal=(b,w)=>cpseudo(b,w).filter(m=>!cinCheck(capply(b,m),w));
+const ceval=b=>{let s=0;for(const p of b)if(p){const v=CVAL[p.toLowerCase()];s+=isW(p)?v:-v}return s};
+function csearch(b,w,d,al,be){if(!d)return ceval(b);const ms=clegal(b,w);if(!ms.length)return cinCheck(b,w)?(w?-1e5-d:1e5+d):0;
+ let best=w?-1e9:1e9;
+ for(const m of ms){const v=csearch(capply(b,m),!w,d-1,al,be);if(w){if(v>best)best=v;if(best>al)al=best}else{if(v<best)best=v;if(best<be)be=best}if(al>=be)break}
+ return best}
+function chessGame(area,done){
+ let b=[..."rnbqkbnr",...Array(8).fill("p"),...Array(32).fill(""),...Array(8).fill("P"),..."RNBQKBNR"],sel=-1,tg=[],mv=0,over=false,busy=false;
+ const st=t=>{const e=$("#gscore");if(e)e.textContent=t};
+ const render=()=>{area.innerHTML=`<div style="display:grid;grid-template-columns:repeat(8,1fr);width:min(92vw,360px);border:1px solid var(--line);border-radius:8px;overflow:hidden">${b.map((p,i)=>{const w=p&&isW(p),bg=i===sel?"#f5d442":tg.includes(i)?"#8fd18f":((i>>3)+(i&7))%2?"#7a6aa8":"#e6e0ff";
+   return `<button data-sq="${i}" style="aspect-ratio:1;padding:0;border-radius:0;font-size:min(8vw,30px);line-height:1;background:${bg};color:${w?"#fff":"#111"};text-shadow:${w?"0 0 2px #000,0 0 3px #000,0 0 3px #000":"none"}">${p?CG[p.toLowerCase()]:""}</button>`}).join("")}</div>`};
+ const finish=(win,text)=>{over=true;st("");done({win,moves:mv,text})};
+ const ai=()=>{if(over)return;const ms=clegal(b,false);ms.sort(()=>Math.random()-.5);let bm=ms[0],bv=1e9;
+  for(const m of ms){const v=csearch(capply(b,m),true,2,-1e9,1e9);if(v<bv){bv=v;bm=m}}
+  b=capply(b,bm);busy=false;render();
+  if(!clegal(b,true).length)return finish(false,cinCheck(b,true)?"Checkmate, the computer wins.":"Stalemate, it’s a draw.");
+  st(cinCheck(b,true)?"Check! Your move":"Your move")};
+ const go=m=>{b=capply(b,m);sel=-1;tg=[];mv++;render();
+  if(!clegal(b,false).length){const ck=cinCheck(b,false);return finish(ck,ck?"Checkmate, you win!":"Stalemate, it’s a draw.")}
+  busy=true;st("Thinking…");setTimeout(ai,250)};
+ area.onclick=e=>{const s=e.target.closest("[data-sq]");if(!s||over||busy)return;const i=+s.dataset.sq,p=b[i];
+  if(sel>=0&&tg.includes(i))return go([sel,i]);
+  if(p&&isW(p)){sel=i;tg=clegal(b,true).filter(m=>m[0]===i).map(m=>m[1])}else{sel=-1;tg=[]}
+  render()};
+ render();st("Your move (white)");
+ return{stop(){over=true},resign(){if(!over&&!busy)finish(false,"You resigned.")}}}
 </script>
 </body>
 </html>
