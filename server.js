@@ -28,13 +28,14 @@ try{db.exec("ALTER TABLE moves ADD COLUMN owner TEXT DEFAULT ''")}catch(e){}
 try{db.exec("ALTER TABLE cats ADD COLUMN owner TEXT DEFAULT ''")}catch(e){}
 for(const c of["ALTER TABLE items ADD COLUMN hidden INTEGER DEFAULT 0","ALTER TABLE cats ADD COLUMN hidden INTEGER DEFAULT 0","ALTER TABLE moves ADD COLUMN hidden INTEGER DEFAULT 0","ALTER TABLE items ADD COLUMN rarity TEXT DEFAULT ''","ALTER TABLE cats ADD COLUMN rarity TEXT DEFAULT ''","ALTER TABLE moves ADD COLUMN rarity TEXT DEFAULT ''","ALTER TABLE moves ADD COLUMN type TEXT DEFAULT 'normal'","ALTER TABLE cats ADD COLUMN t1 TEXT DEFAULT 'normal'","ALTER TABLE cats ADD COLUMN t2 TEXT DEFAULT ''","ALTER TABLE cats ADD COLUMN evo TEXT DEFAULT ''","ALTER TABLE cats ADD COLUMN po INTEGER DEFAULT 0","ALTER TABLE players ADD COLUMN cx TEXT DEFAULT '{}'","ALTER TABLE players ADD COLUMN noscratch INTEGER DEFAULT 0","ALTER TABLE players ADD COLUMN eqc TEXT DEFAULT NULL"])try{db.exec(c)}catch(e){}
 db.exec("CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY AUTOINCREMENT,pid TEXT,text TEXT,ts INTEGER)");
+db.exec("CREATE TABLE IF NOT EXISTS news(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT,body TEXT,name TEXT,ts INTEGER)");
 const MAX_SELL=5;
 const q=s=>db.prepare(s);
 
 // ---- persistence: the host's disk is wiped when the server sleeps, so the whole
 // database is copied to Supabase (one row) after changes and loaded back on startup.
 const SB_URL=(process.env.SUPABASE_URL||"").replace(/\/+$/,""),SB_KEY=process.env.SUPABASE_SERVICE_KEY||"",SB_ON=!!(SB_URL&&SB_KEY);
-const TABLES=["players","items","messages","sessions","blocked","cats","moves","notes","badwords"];
+const TABLES=["players","items","messages","sessions","blocked","cats","moves","notes","badwords","news"];
 const sb=(method,p,body)=>fetch(SB_URL+"/rest/v1/"+p,{method,headers:{apikey:SB_KEY,...(SB_KEY.startsWith("eyJ")?{Authorization:"Bearer "+SB_KEY}:{}),"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:body&&JSON.stringify(body)});
 const EXTRA={};  // tables in the backup that this server doesn't know about: kept and written back untouched
 const dump=()=>{const o={...EXTRA};for(const t of TABLES)o[t]=db.prepare("SELECT * FROM "+t).all();return o};
@@ -195,6 +196,8 @@ const useMaker=(p,id,kind)=>{const i=q("SELECT * FROM items WHERE id=?").get(par
  const inv=JSON.parse(p.inv);if(!inv[i.id])bad("You don’t have that");
  if(--inv[i.id]<=0)delete inv[i.id];
  q("UPDATE players SET inv=? WHERE id=?").run(JSON.stringify(inv),p.id);return i};
+// arcade: a game must be started on the server before it can pay out; payouts are capped per 24 hours
+const arc=new Map(),arcDay=new Map(),ARC_CAP=1000;
 const actions={
  send(p,b){const t=String(b.text||"").trim().slice(0,300);if(!t)bad("Empty message");
   if(Date.now()-(lastMsg.get(p.id)||0)<500)bad("Slow down");lastMsg.set(p.id,Date.now());post(p.name,t,0)},
@@ -374,6 +377,16 @@ const actions={
  "word/ban"(p,b){adm(p);const w=String(b.w||"").trim().toLowerCase().slice(0,16);if(!/^[a-z0-9_]+$/.test(w)||norm(w).length<3)bad("Use a word of 3+ letters or numbers");
   q("INSERT OR IGNORE INTO badwords(w) VALUES(?)").run(w)},
  "word/unban"(p,b){adm(p);q("DELETE FROM badwords WHERE w=?").run(String(b.w||"").toLowerCase())},
+ "news/add"(p,b){adm(p);const t=String(b.title||"").trim().slice(0,80),x=String(b.body||"").trim().slice(0,1000);if(!t||!x)bad("Write a headline and some text");q("INSERT INTO news(title,body,name,ts) VALUES(?,?,?,?)").run(t,x,p.name,Date.now())},
+ "news/remove"(p,b){adm(p);q("DELETE FROM news WHERE id=?").run(parseInt(b.id))},
+ "arcade/start"(p,b){if(!["chess","tetris","snake"].includes(b.game))bad("Unknown game");arc.set(p.id,{game:b.game,ts:Date.now()})},
+ "arcade/finish"(p,b){const s=arc.get(p.id);arc.delete(p.id);if(!s||s.game!==b.game||Date.now()-s.ts>72e5)bad("That game wasn’t started");
+  const sec=(Date.now()-s.ts)/1000;let pts=0,reward=0;
+  if(s.game==="chess"){if(b.win===true&&sec>=60&&(parseInt(b.moves)||0)>=6)reward=100}
+  else{pts=Math.max(0,parseInt(b.score)||0);const max=s.game==="snake"?Math.floor(sec*30)+10:Math.floor(sec*200)+300;if(pts>max)bad("That score doesn’t look right");reward=Math.floor(pts/2)}
+  const now=Date.now(),d=arcDay.get(p.id),cur=d&&now-d.ts<864e5?d:{ts:now,n:0},give=Math.max(0,Math.min(reward,ARC_CAP-cur.n));
+  cur.n+=give;arcDay.set(p.id,cur);if(give)q("UPDATE players SET coins=coins+? WHERE id=?").run(give,p.id);
+  return{res:{game:s.game,pts,reward:give,capped:give<reward}}},
  "admin/clear"(p){adm(p);q("DELETE FROM messages").run()},
 };
 function tx(fn){db.exec("BEGIN");try{const r=fn();db.exec("COMMIT");return r}catch(e){db.exec("ROLLBACK");throw e}}
@@ -387,7 +400,8 @@ const snapshot=()=>{const on=new Set([...clients].map(c=>c.pid));return JSON.str
  items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal",seller:i.seller||"",cap:i.cap||0,rarity:i.rarity||"",listed:!i.hidden,gone:i.hidden===2,img:i.img?`/img/item/${i.id}?v=${iv(i.img)}`:""})),
  cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,price:c.price||0,owner:c.owner||"",rarity:c.rarity||"",po:!!c.po,t:[c.t1||"normal",c.t2||""].filter(Boolean),evo:evoOf(c),listed:!c.hidden,gone:c.hidden===2,img:c.img?`/img/cat/${c.id}?v=${iv(c.img)}`:""})),
  moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,owner:k.owner||"",rarity:k.rarity||"",type:k.type||"normal",listed:!k.hidden,gone:k.hidden===2,fx:fxInfo(k)})),
- messages:q("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all()})};
+ messages:q("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all(),
+ news:q("SELECT * FROM news ORDER BY id DESC LIMIT 30").all()})};
 function sendTo(c,base){const m=find(c.pid);if(!m)return;const cxm=JSON.parse(m.cx||"{}");
  c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),daily:m.daily,moves:JSON.parse(m.moves||"[]"),eq:equipped(m),scratch:!m.noscratch,lv:Object.fromEntries(JSON.parse(m.cats||"[]").map(id=>{const c=q("SELECT hp FROM cats WHERE id=?").get(id),pg=prog(cxm[id]||0);return[id,{...pg,hp:c?hpAt(c.hp,pg.lvl):0}]})),eqc:eqMap(m),battle:inBattle(m.id)||null,trades:[...trades.values()].filter(x=>x.from===m.id||x.to===m.id).map(({id,from,to,give,want})=>({id,from,to,give,want})),blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined,notes:q("SELECT id,text FROM notes WHERE pid=? ORDER BY id").all(m.id),words:m.admin?q("SELECT w FROM badwords ORDER BY w").all().map(r=>r.w):undefined})+"}\n\n")}
 function broadcast(){if(!clients.size)return;const base=snapshot();for(const c of clients)sendTo(c,base)}
@@ -434,7 +448,7 @@ http.createServer(async(req,res)=>{
    if(!Object.hasOwn(actions,act))return J(res,404,{error:"Unknown action"});
    const r=tx(()=>actions[act](p,b));push();
    if(r&&r.kick)for(const c of clients)if(c.pid===r.kick){c.res.write("event: bye\ndata: "+(r.reason||"")+"\n\n");c.res.end();clients.delete(c)}
-   return J(res,200,{ok:1});
+   return J(res,200,r&&r.res?{ok:1,res:r.res}:{ok:1});
   }
   res.writeHead(404).end("Not found");
  }catch(e){
