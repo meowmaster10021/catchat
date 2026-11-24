@@ -29,13 +29,16 @@ try{db.exec("ALTER TABLE cats ADD COLUMN owner TEXT DEFAULT ''")}catch(e){}
 for(const c of["ALTER TABLE items ADD COLUMN hidden INTEGER DEFAULT 0","ALTER TABLE cats ADD COLUMN hidden INTEGER DEFAULT 0","ALTER TABLE moves ADD COLUMN hidden INTEGER DEFAULT 0","ALTER TABLE items ADD COLUMN rarity TEXT DEFAULT ''","ALTER TABLE cats ADD COLUMN rarity TEXT DEFAULT ''","ALTER TABLE moves ADD COLUMN rarity TEXT DEFAULT ''","ALTER TABLE moves ADD COLUMN type TEXT DEFAULT 'normal'","ALTER TABLE cats ADD COLUMN t1 TEXT DEFAULT 'normal'","ALTER TABLE cats ADD COLUMN t2 TEXT DEFAULT ''","ALTER TABLE cats ADD COLUMN evo TEXT DEFAULT ''","ALTER TABLE cats ADD COLUMN po INTEGER DEFAULT 0","ALTER TABLE players ADD COLUMN cx TEXT DEFAULT '{}'","ALTER TABLE players ADD COLUMN noscratch INTEGER DEFAULT 0","ALTER TABLE players ADD COLUMN eqc TEXT DEFAULT NULL"])try{db.exec(c)}catch(e){}
 db.exec("CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY AUTOINCREMENT,pid TEXT,text TEXT,ts INTEGER)");
 db.exec("CREATE TABLE IF NOT EXISTS news(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT,body TEXT,name TEXT,ts INTEGER)");
+db.exec("CREATE TABLE IF NOT EXISTS foes(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT,name TEXT,img TEXT DEFAULT '',team TEXT,reward INTEGER DEFAULT 0)");
+try{db.exec("ALTER TABLE moves ADD COLUMN heal INTEGER DEFAULT 0")}catch(e){}
+try{db.exec("ALTER TABLE players ADD COLUMN fc TEXT DEFAULT '{}'")}catch(e){}
 const MAX_SELL=5;
 const q=s=>db.prepare(s);
 
 // ---- persistence: the host's disk is wiped when the server sleeps, so the whole
 // database is copied to Supabase (one row) after changes and loaded back on startup.
 const SB_URL=(process.env.SUPABASE_URL||"").replace(/\/+$/,""),SB_KEY=process.env.SUPABASE_SERVICE_KEY||"",SB_ON=!!(SB_URL&&SB_KEY);
-const TABLES=["players","items","messages","sessions","blocked","cats","moves","notes","badwords","news"];
+const TABLES=["players","items","messages","sessions","blocked","cats","moves","notes","badwords","news","foes"];
 const sb=(method,p,body)=>fetch(SB_URL+"/rest/v1/"+p,{method,headers:{apikey:SB_KEY,...(SB_KEY.startsWith("eyJ")?{Authorization:"Bearer "+SB_KEY}:{}),"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:body&&JSON.stringify(body)});
 const EXTRA={};  // tables in the backup that this server doesn't know about: kept and written back untouched
 const dump=()=>{const o={...EXTRA};for(const t of TABLES)o[t]=db.prepare("SELECT * FROM "+t).all();return o};
@@ -153,7 +156,8 @@ const mkTeam=(pl,lead)=>{const cs=JSON.parse(pl.cats||"[]").map(id=>q("SELECT * 
  if(!cs.length)bad(pl.name+" has no cats");const cx0=JSON.parse(pl.cx||"{}");
  return sync({pid:pl.id,name:pl.name,team:cs.map((c,i)=>{const lv=lvOf(cx0[c.id]||0),mx=hpAt(c.hp,lv);return{id:c.id,name:c.name,img:c.img?`/img/cat/${c.id}?v=${iv(c.img)}`:"",max:mx,hp:mx,lvl:lv,t:[c.t1||"normal",c.t2||""].filter(Boolean),used:i===0}}),cur:0})};
 // bets: both players' coins are held when the battle starts; the winner gets the pot
-const finish=(x,win)=>{x.state="done";x.winner=win;x.n++;if(x.n>=4)awardXp(x,win);if(x.pot&&!x.paid){x.paid=1;q("UPDATE players SET coins=coins+? WHERE id=?").run(x.pot,win)}};
+const finish=(x,win)=>{x.state="done";x.winner=win;x.n++;if(x.n>=4)awardXp(x,win);if(x.pot&&!x.paid){x.paid=1;q("UPDATE players SET coins=coins+? WHERE id=?").run(x.pot,win)}
+ if(x.foe&&!x.rpaid){x.rpaid=1;const pl=find(win);if(pl){const fc=JSON.parse(pl.fc||"{}"),now=Date.now();if(fc[x.foe]&&now-fc[x.foe]<864e5)x.got=0;else{fc[x.foe]=now;x.got=x.reward||0;q("UPDATE players SET coins=coins+?,fc=? WHERE id=?").run(x.got,JSON.stringify(fc),pl.id)}}}};
 const refund=x=>{if(x.state==="active"&&x.bet&&!x.paid){x.paid=1;for(const s of[x.a,x.b]){const pl=find(s.pid);if(pl&&!inf(pl))q("UPDATE players SET coins=coins+? WHERE id=?").run(x.bet,pl.id)}}};
 const battles=new Map();let bid=0;const trades=new Map();let tid=0;
 const inBattle=id=>[...battles.values()].find(x=>x.a.pid===id||x.b.pid===id);
@@ -196,6 +200,32 @@ const useMaker=(p,id,kind)=>{const i=q("SELECT * FROM items WHERE id=?").get(par
  const inv=JSON.parse(p.inv);if(!inv[i.id])bad("You don’t have that");
  if(--inv[i.id]<=0)delete inv[i.id];
  q("UPDATE players SET inv=? WHERE id=?").run(JSON.stringify(inv),p.id);return i};
+// ---- wild cats and trainers fight as computer players; hit() is shared by players and the computer
+const mkNpc=f=>{const es=JSON.parse(f.team||"[]").map(e=>({e,c:q("SELECT * FROM cats WHERE id=?").get(e.cat)})).filter(z=>z.c);
+ if(!es.length)bad("That opponent has no cats yet");
+ return sync({pid:"npc:"+f.id,name:f.name,npc:1,team:es.map(({e,c},i)=>{const lv=Math.min(MAXLV,Math.max(1,parseInt(e.lvl)||1)),mx=hpAt(c.hp,lv);return{id:c.id,name:c.name,img:c.img?`/img/cat/${c.id}?v=${iv(c.img)}`:"",max:mx,hp:mx,lvl:lv,t:[c.t1||"normal",c.t2||""].filter(Boolean),used:i===0,mv:Array.isArray(e.moves)&&e.moves.length?e.moves:[0]}}),cur:0})};
+const hit=(x,sd,m)=>{const me=x[sd],os=sd==="a"?"b":"a",o=x[os],oc=o.team[o.cur],at=me.team[me.cur],mt=m.type||"normal";
+ let dmg=0,ef=1,hl=0;
+ if(m.damage>0){ef=eff(mt,oc.t);dmg=ef===0?0:Math.max(1,Math.round(dmgAt(m.damage,at.lvl||1)*ef*((at.t||[]).includes(mt)?1.5:1)));oc.hp=Math.max(0,oc.hp-dmg);sync(o)}
+ if(m.heal>0){hl=Math.min(at.max-at.hp,m.heal);at.hp+=hl;sync(me)}
+ x.n++;x.ts=Date.now();
+ x.last={by:me.pid,move:m.name,anim:m.anim,dmg,type:mt,fx:fxInfo(m),heal:!(m.damage>0)};
+ x.log=[...x.log,`${me.cat.name} used ${m.name}!`+(m.damage>0?` (${dmg} damage)${ef===0?" It had no effect…":ef>1?" Super effective!":ef<1?" Not very effective…":""}`:"")+(m.heal>0?` Restored ${hl} HP.`:"")].slice(-6);
+ if(m.damage>0&&oc.hp<=0){x.log=[...x.log,`${o.name}’s ${oc.name} fainted!`].slice(-6);
+  if(o.team.filter(c=>c.hp<=0).length>=Math.min(3,o.team.length)){finish(x,me.pid);post(me.name,`${me.name} beat ${o.name} in a cat battle`)}
+  else{x.turn=os;x.need=os}}
+ else x.turn=os};
+const npcRun=x=>{for(let g=0;g<6&&x.state==="active"&&x[x.turn].npc;g++){const sd=x.turn,s=x[sd];
+  if(x.need===sd){const i=s.team.findIndex(c=>c.hp>0);if(i<0)break;s.cur=i;s.team[i].used=true;sync(s);x.n++;x.last=null;x.log=[...x.log,`${s.name} sent out ${s.cat.name}!`].slice(-6);x.need=null;continue}
+  const at=s.team[s.cur],ms=(at.mv||[0]).map(id=>id?q("SELECT * FROM moves WHERE id=?").get(id):SCRATCH).filter(Boolean);
+  let pool=ms.filter(m=>m.damage>0||at.hp<at.max);if(!pool.length)pool=[SCRATCH];
+  const hs=pool.filter(m=>m.heal>0&&at.hp<at.max*.5);if(hs.length&&Math.random()<.7)pool=hs;
+  hit(x,sd,pool[Math.floor(Math.random()*pool.length)])}};
+// news text: only a few harmless tags survive, with no attributes; everything else is shown as plain text
+const ENT={"&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"',"&#39;":"'","&nbsp;":" "},TAGMAP={b:"b",strong:"b",i:"i",em:"i",u:"u",h1:"h3",h2:"h3",h3:"h3",ul:"ul",ol:"ol",li:"li",p:"p",div:"p",br:"br"};
+const escT=t=>t.replace(/&[a-z#0-9]+;/gi,m=>ENT[m.toLowerCase()]??m).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
+const cleanHtml=s=>String(s||"").slice(0,6000).split(/(<[^>]*>)/).map((part,i)=>{if(i%2===0)return escT(part);
+ const m=/^<\s*(\/?)\s*([a-z0-9]+)[^>]*>$/i.exec(part),n=m&&TAGMAP[m[2].toLowerCase()];if(!n)return "";return n==="br"?"<br>":`<${m[1]?"/":""}${n}>`}).join("");
 // arcade: a game must be started on the server before it can pay out; payouts are capped per 24 hours
 const arc=new Map(),arcDay=new Map(),ARC_CAP=1000;
 const actions={
@@ -248,9 +278,9 @@ const actions={
  infinite(p,b){root(p);q("UPDATE players SET infinite=? WHERE id=?").run(b.on?1:0,p.id)},
  "item/add"(p,b){adm(p);const pr=parseInt(b.price);if(!(pr>=0&&pr<=1e6))bad("Enter a price (0 for a free item)");const name=String(b.name||"").trim().slice(0,40);if(!name)bad("Give the item a name");
   const st=parseInt(b.stock);
-  const kind=["physical","fun","attackmaker","catmaker"].includes(b.kind)?b.kind:"normal",cap=Math.min(1e6,Math.max(0,parseInt(b.cap)||0));
-  if(kind.endsWith("maker")&&cap<1)bad("Set the max "+(kind==="attackmaker"?"damage":"HP")+" for this maker");
-  q("INSERT INTO items(name,emoji,descr,price,stock,kind,img,cap,rarity) VALUES(?,?,?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),pr,st>0?st:-1,kind,imgOk(b.img),kind.endsWith("maker")?cap:0,rr(b.rarity))},
+  const kind=["physical","fun","attackmaker","catmaker","heal"].includes(b.kind)?b.kind:"normal",cap=Math.min(1e6,Math.max(0,parseInt(b.cap)||0));
+  if((kind.endsWith("maker")||kind==="heal")&&cap<1)bad(kind==="heal"?"Set how much HP this heals":"Set the max "+(kind==="attackmaker"?"damage":"HP")+" for this maker");
+  q("INSERT INTO items(name,emoji,descr,price,stock,kind,img,cap,rarity) VALUES(?,?,?,?,?,?,?,?,?)").run(name,String(b.emoji||"").trim().slice(0,4)||"🎁",String(b.desc||"").trim().slice(0,80),pr,st>0?st:-1,kind,imgOk(b.img),(kind.endsWith("maker")||kind==="heal")?cap:0,rr(b.rarity))},
  "cat/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the cat a name");
   const t1=tp(b.t1);q("INSERT INTO cats(name,img,hp,price,t1,t2,po,rarity) VALUES(?,?,?,?,?,?,?,?)").run(n,imgOk(b.img),Math.min(9999,Math.max(1,parseInt(b.hp)||50)),Math.max(0,parseInt(b.price)||0),t1,t2f(b.t2,t1),b.po?1:0,rr(b.rarity))},
  "cat/buy"(p,b){const c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.id));if(!c||c.hidden||c.po)bad("That cat is gone");
@@ -260,7 +290,8 @@ const actions={
  "cat/remove"(p,b){adm(p);q("UPDATE cats SET hidden=1 WHERE id=?").run(parseInt(b.id))},
  "move/add"(p,b){adm(p);const n=String(b.name||"").trim().slice(0,30);if(!n)bad("Give the ability a name");
   const fx=b.fx?normFx(b.fx):"";if(b.fx&&!fx)bad("That animation is too big or invalid");
-  q("INSERT INTO moves(name,damage,anim,price,fx,type,rarity) VALUES(?,?,?,?,?,?,?)").run(n,Math.min(1e6,Math.max(1,parseInt(b.damage)||10)),ANIMS.includes(b.anim)?b.anim:"slash",Math.max(0,parseInt(b.price)||0),fx,tp(b.type),rr(b.rarity))},
+  const dm=Math.min(1e6,Math.max(0,parseInt(b.damage)||0)),hl=Math.min(1e6,Math.max(0,parseInt(b.heal)||0));if(!dm&&!hl)bad("Set some damage or some healing");
+  q("INSERT INTO moves(name,damage,anim,price,fx,type,rarity,heal) VALUES(?,?,?,?,?,?,?,?)").run(n,dm,ANIMS.includes(b.anim)?b.anim:"slash",Math.max(0,parseInt(b.price)||0),fx,tp(b.type),rr(b.rarity),hl)},
  "move/equip"(p,b){const id=parseInt(b.id)||0,cat=parseInt(b.cat),on=!!b.on,cs=JSON.parse(p.cats||"[]");
   if(!cs.includes(cat))bad("You don’t own that cat");if(id&&!owned(p).includes(id))bad("You don’t know that ability");
   const m=eqMap(p);
@@ -294,19 +325,37 @@ const actions={
   const me=x[x.turn];if(me.pid!==p.id)bad("It’s not your turn");
   const id=parseInt(b.move)||0,m=id?q("SELECT * FROM moves WHERE id=?").get(id):SCRATCH;
   if(!m||!(eqMap(p)[me.team[me.cur].id]||[]).includes(id))bad("That ability isn’t equipped on this cat");
-  const os=x.turn==="a"?"b":"a",o=x[os],oc=o.team[o.cur],at=me.team[me.cur],mt=m.type||"normal",ef=eff(mt,oc.t),dmg=ef===0?0:Math.max(1,Math.round(dmgAt(m.damage,at.lvl||1)*ef*((at.t||[]).includes(mt)?1.5:1)));oc.hp=Math.max(0,oc.hp-dmg);sync(o);x.n++;x.ts=Date.now();
-  x.last={by:me.pid,move:m.name,anim:m.anim,dmg,type:mt,fx:fxInfo(m)};x.log=[...x.log,`${me.cat.name} used ${m.name}! (${dmg} damage)${ef===0?" It had no effect…":ef>1?" Super effective!":ef<1?" Not very effective…":""}`].slice(-6);
-  if(oc.hp<=0){x.log=[...x.log,`${o.name}’s ${oc.name} fainted!`].slice(-6);
-   if(o.team.filter(c=>c.hp<=0).length>=Math.min(3,o.team.length)){finish(x,me.pid);post(p.name,`${me.name} beat ${o.name} in a cat battle`)}
-   else{x.turn=os;x.need=os}}
-  else x.turn=os},
+  hit(x,x.turn,m);npcRun(x)},
+ "battle/item"(p,b){const x=battles.get(parseInt(b.id));if(!x||x.state!=="active")bad("No active battle");
+  if(x.need)bad("A cat has to be swapped in first");
+  const sd=x.turn,me=x[sd];if(me.pid!==p.id)bad("It’s not your turn");
+  const i=q("SELECT * FROM items WHERE id=?").get(parseInt(b.item));if(!i||i.kind!=="heal")bad("That isn’t a healing item");
+  const inv=JSON.parse(p.inv);if(!inv[i.id])bad("You don’t have that");
+  const c=me.team[me.cur];if(c.hp>=c.max)bad("That cat is already at full health");
+  if(--inv[i.id]<=0)delete inv[i.id];q("UPDATE players SET inv=? WHERE id=?").run(JSON.stringify(inv),p.id);
+  const gain=Math.min(c.max-c.hp,i.cap);c.hp+=gain;sync(me);x.n++;x.ts=Date.now();x.last=null;
+  x.log=[...x.log,`${me.name} used ${i.name} on ${c.name}! (+${gain} HP)`].slice(-6);x.turn=sd==="a"?"b":"a";npcRun(x)},
+ "battle/foe"(p,b){const f=q("SELECT * FROM foes WHERE id=?").get(parseInt(b.id)),c=q("SELECT * FROM cats WHERE id=?").get(parseInt(b.cat));
+  if(!f)bad("That opponent is gone");if(!c||!JSON.parse(p.cats||"[]").includes(c.id))bad("Pick one of your cats");
+  if(inBattle(p.id))bad("You’re already in a battle");
+  const npc=mkNpc(f),mine=mkTeam(p,c.id);
+  battles.set(++bid,{id:bid,state:"active",bet:0,pot:0,need:null,foe:f.id,reward:f.reward||0,a:mine,b:npc,turn:"a",n:0,last:null,log:[`${f.name} wants to fight!`],ts:Date.now()})},
+ "foe/add"(p,b){adm(p);const kind=b.kind==="trainer"?"trainer":"wild",name=String(b.name||"").trim().slice(0,30);if(!name)bad("Give it a name");
+  const raw=(Array.isArray(b.team)?b.team:[]).slice(0,kind==="wild"?1:6),seen=new Set(),team=[];
+  for(const e of raw){const id=parseInt(e.cat);if(!q("SELECT 1 FROM cats WHERE id=? AND owner=''").get(id))bad("Pick a cat from the list");if(seen.has(id))bad("Each cat can only be used once per team");seen.add(id);
+   const mv=[...new Set((Array.isArray(e.moves)?e.moves:[]).map(x=>parseInt(x)||0))];if(mv.length>4)bad("At most 4 attacks per cat");
+   for(const m of mv)if(m&&!q("SELECT 1 FROM moves WHERE id=? AND owner=''").get(m))bad("One of those attacks is gone");
+   team.push({cat:id,lvl:Math.min(MAXLV,Math.max(1,parseInt(e.lvl)||1)),moves:mv.length?mv:[0]})}
+  if(!team.length)bad("Add at least one cat");
+  q("INSERT INTO foes(kind,name,img,team,reward) VALUES(?,?,?,?,?)").run(kind,name,imgOk(b.img),JSON.stringify(team),Math.min(1e6,Math.max(0,parseInt(b.reward)||0)))},
+ "foe/remove"(p,b){adm(p);q("DELETE FROM foes WHERE id=?").run(parseInt(b.id))},
  "battle/switch"(p,b){const x=battles.get(parseInt(b.id));if(!x||x.state!=="active")bad("No active battle");
   const side=x.a.pid===p.id?"a":x.b.pid===p.id?"b":"";if(!side)bad("That’s not your battle");
   const s=x[side],i=s.team.findIndex(c=>c.id===parseInt(b.cat));
   if(i<0||s.team[i].hp<=0||i===s.cur)bad("Pick a cat that can still fight");
   const free=x.need===side;if(!free&&(x.need||x.turn!==side))bad("It’s not your turn");
   s.cur=i;s.team[i].used=true;sync(s);x.n++;x.ts=Date.now();x.last=null;x.log=[...x.log,`${s.name} sent out ${s.cat.name}!`].slice(-6);
-  if(free)x.need=null;else x.turn=side==="a"?"b":"a"},
+  if(free)x.need=null;else x.turn=side==="a"?"b":"a";npcRun(x)},
  "battle/leave"(p){const x=inBattle(p.id);if(!x)bad("You’re not in a battle");
   if(x.state==="active"){x.log=[...x.log,`${p.name} gave up`].slice(-6);finish(x,x.a.pid===p.id?x.b.pid:x.a.pid)}else battles.delete(x.id)},
  "trade/offer"(p,b){const t=find(b.to);if(!t||t.banned||t.id===p.id)bad("Pick another player");
@@ -377,7 +426,7 @@ const actions={
  "word/ban"(p,b){adm(p);const w=String(b.w||"").trim().toLowerCase().slice(0,16);if(!/^[a-z0-9_]+$/.test(w)||norm(w).length<3)bad("Use a word of 3+ letters or numbers");
   q("INSERT OR IGNORE INTO badwords(w) VALUES(?)").run(w)},
  "word/unban"(p,b){adm(p);q("DELETE FROM badwords WHERE w=?").run(String(b.w||"").toLowerCase())},
- "news/add"(p,b){adm(p);const t=String(b.title||"").trim().slice(0,80),x=String(b.body||"").trim().slice(0,1000);if(!t||!x)bad("Write a headline and some text");q("INSERT INTO news(title,body,name,ts) VALUES(?,?,?,?)").run(t,x,p.name,Date.now())},
+ "news/add"(p,b){adm(p);const t=String(b.title||"").trim().slice(0,80),x=cleanHtml(b.body);if(!t||!x.replace(/<[^>]*>/g,"").trim())bad("Write a headline and some text");q("INSERT INTO news(title,body,name,ts) VALUES(?,?,?,?)").run(t,x,p.name,Date.now())},
  "news/remove"(p,b){adm(p);q("DELETE FROM news WHERE id=?").run(parseInt(b.id))},
  "arcade/start"(p,b){if(!["chess","tetris","snake"].includes(b.game))bad("Unknown game");arc.set(p.id,{game:b.game,ts:Date.now()})},
  "arcade/finish"(p,b){const s=arc.get(p.id);arc.delete(p.id);if(!s||s.game!==b.game||Date.now()-s.ts>72e5)bad("That game wasn’t started");
@@ -399,9 +448,10 @@ const snapshot=()=>{const on=new Set([...clients].map(c=>c.pid));return JSON.str
  players:q("SELECT * FROM players").all().map(p=>({...pub(p),online:on.has(p.id)})),
  items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal",seller:i.seller||"",cap:i.cap||0,rarity:i.rarity||"",listed:!i.hidden,gone:i.hidden===2,img:i.img?`/img/item/${i.id}?v=${iv(i.img)}`:""})),
  cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,price:c.price||0,owner:c.owner||"",rarity:c.rarity||"",po:!!c.po,t:[c.t1||"normal",c.t2||""].filter(Boolean),evo:evoOf(c),listed:!c.hidden,gone:c.hidden===2,img:c.img?`/img/cat/${c.id}?v=${iv(c.img)}`:""})),
- moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,owner:k.owner||"",rarity:k.rarity||"",type:k.type||"normal",listed:!k.hidden,gone:k.hidden===2,fx:fxInfo(k)})),
+ moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,owner:k.owner||"",rarity:k.rarity||"",type:k.type||"normal",heal:k.heal||0,listed:!k.hidden,gone:k.hidden===2,fx:fxInfo(k)})),
  messages:q("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all(),
- news:q("SELECT * FROM news ORDER BY id DESC LIMIT 30").all()})};
+ news:q("SELECT * FROM news ORDER BY id DESC LIMIT 30").all().map(n=>({...n,body:cleanHtml(n.body)})),
+ foes:q("SELECT * FROM foes").all().map(f=>{let t=[];try{t=JSON.parse(f.team)}catch(e){}return{id:f.id,kind:f.kind,name:f.name,reward:f.reward||0,img:f.img?`/img/foe/${f.id}?v=${iv(f.img)}`:"",team:t}})})};
 function sendTo(c,base){const m=find(c.pid);if(!m)return;const cxm=JSON.parse(m.cx||"{}");
  c.res.write("event: state\ndata: "+base.slice(0,-1)+',"me":'+JSON.stringify({inv:JSON.parse(m.inv),daily:m.daily,moves:JSON.parse(m.moves||"[]"),eq:equipped(m),scratch:!m.noscratch,lv:Object.fromEntries(JSON.parse(m.cats||"[]").map(id=>{const c=q("SELECT hp FROM cats WHERE id=?").get(id),pg=prog(cxm[id]||0);return[id,{...pg,hp:c?hpAt(c.hp,pg.lvl):0}]})),eqc:eqMap(m),battle:inBattle(m.id)||null,trades:[...trades.values()].filter(x=>x.from===m.id||x.to===m.id).map(({id,from,to,give,want})=>({id,from,to,give,want})),blocked:m.id===ROOT?q("SELECT id FROM blocked").all().map(r=>r.id):undefined,notes:q("SELECT id,text FROM notes WHERE pid=? ORDER BY id").all(m.id),words:m.admin?q("SELECT w FROM badwords ORDER BY w").all().map(r=>r.w):undefined})+"}\n\n")}
 function broadcast(){if(!clients.size)return;const base=snapshot();for(const c of clients)sendTo(c,base)}
@@ -432,7 +482,7 @@ http.createServer(async(req,res)=>{
    if(url.pathname.startsWith("/img/move/")){const[,,,id,n]=url.pathname.split("/"),r=q("SELECT fx FROM moves WHERE id=?").get(parseInt(id));let o={};try{o=JSON.parse(r&&r.fx||"{}")}catch(e){}
     const s=o.t==="gif"?o.g:o.t==="frames"?o.f[parseInt(n)]:"",m=/^data:(image\/(?:gif|png));base64,(.*)$/.exec(s||"");if(!m)return res.writeHead(404).end();
     res.writeHead(200,{"Content-Type":m[1],"Cache-Control":"public,max-age=31536000,immutable","X-Content-Type-Options":"nosniff"});return res.end(Buffer.from(m[2],"base64"))}
-   if(url.pathname.startsWith("/img/")){const[,,k,id]=url.pathname.split("/"),r=(k==="item"||k==="cat")&&q(`SELECT img FROM ${k==="cat"?"cats":"items"} WHERE id=?`).get(parseInt(id)),
+   if(url.pathname.startsWith("/img/")){const[,,k,id]=url.pathname.split("/"),r=(k==="item"||k==="cat"||k==="foe")&&q(`SELECT img FROM ${k==="cat"?"cats":k==="foe"?"foes":"items"} WHERE id=?`).get(parseInt(id)),
      m=r&&/^data:(image\/(?:jpeg|png|webp));base64,(.*)$/.exec(r.img||"");if(!m)return res.writeHead(404).end();
     res.writeHead(200,{"Content-Type":m[1],"Cache-Control":"public,max-age=31536000,immutable","X-Content-Type-Options":"nosniff"});return res.end(Buffer.from(m[2],"base64"))}
    if(url.pathname.startsWith("/avatar/")){const p=find(url.pathname.slice(8));
