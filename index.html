@@ -105,6 +105,8 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
 .edb{display:flex;gap:.3rem;flex-wrap:wrap}.edb button{padding:.3em .7em}
 .ed{min-height:7rem;border:1px solid var(--line);border-radius:10px;padding:.55em .75em;background:var(--bg);overflow-wrap:anywhere}.ed:empty::before{content:attr(data-ph);color:var(--mute)}
 .ed h3,.nb h3{margin:.3rem 0;font-size:1.05rem}.ed ul,.ed ol,.nb ul,.nb ol{margin:.3rem 0;padding-left:1.4rem}.nb p{margin:.3rem 0}.nb{overflow-wrap:anywhere}
+.nb h4,.ed h4{margin:.3rem 0;font-size:.95rem;color:var(--mute)}.nb hr,.ed hr{border:0;border-top:1px solid var(--line);margin:.6rem 0}.nb img,.ed img{max-width:100%;border-radius:10px;display:block;margin:.4rem 0}
+.chimg{max-width:100%;max-height:260px;border-radius:10px;display:block;margin-top:.3rem}#chprev{display:flex;align-items:center;gap:.3rem}#chprev[hidden]{display:none}#chprev img{width:36px;height:36px;object-fit:cover;border-radius:8px}
 .apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:.9rem}
 .app{aspect-ratio:1;border-radius:22px;background:var(--panel);color:var(--ink);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.35rem;padding:.3rem}
 .app b{font-size:2.6rem;line-height:1}.app span{font-size:.85rem;font-weight:600}
@@ -126,7 +128,7 @@ dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);bor
  <nav id="nav"></nav>
  <main>
   <section class="pane" id="p-chat"><div id="log"></div>
-   <form id="send"><input id="msg" placeholder="Message, or /pay name 25" autocomplete="off" maxlength="300"><button>Send</button></form></section>
+   <form id="send"><span id="chprev" hidden><img id="chthumb" alt=""><button type="button" class="ghost" id="chx" title="Remove picture">✕</button></span><input id="msg" placeholder="Message, or /pay name 25" autocomplete="off" maxlength="300"><input type="file" id="chfile" accept="image/*" hidden><button type="button" class="ghost" id="chpick" title="Send a picture">🖼</button><button>Send</button></form></section>
   <section class="pane scroll" id="p-shop"></section>
   <section class="pane scroll" id="p-battle"></section>
   <section class="pane scroll" id="p-trade"></section>
@@ -254,17 +256,29 @@ function renderChat(){
  l.innerHTML=msgs.map(m=>{
   if(m.sys)return `<div class="sys">${esc(m.text)}</div>`;
   const mine=m.name&&m.name.toLowerCase()===meId, p=players[(m.name||"").toLowerCase()];
-  return `<div class="mw ${mine?"me":""}">${avHTML(p||{name:m.name||"?"})}<div class="m ${mine?"me":""}"><div class="n">${esc(m.name)}${p&&p.admin?'<span class="tag">admin</span>':""}${isAdmin()?`<button class="x" data-del="${m.id}" title="Delete message">✕</button>`:""}</div>${esc(m.text)}</div></div>`}).join("")||'<div class="empty">No messages yet. Say hi.</div>';
+  return `<div class="mw ${mine?"me":""}">${avHTML(p||{name:m.name||"?"})}<div class="m ${mine?"me":""}"><div class="n">${esc(m.name)}${p&&p.admin?'<span class="tag">admin</span>':""}${isAdmin()?`<button class="x" data-del="${m.id}" title="Delete message">✕</button>`:""}</div>${m.text?esc(m.text):""}${m.img?`<a href="${esc(m.img)}" target="_blank" rel="noopener"><img class="chimg" src="${esc(m.img)}" alt="Picture"></a>`:""}</div></div>`}).join("")||'<div class="empty">No messages yet. Say hi.</div>';
  if(stick)l.scrollTop=l.scrollHeight;
 }
 $("#log").onclick=async e=>{const id=e.target.dataset.del;if(id&&isAdmin())try{await api("admin/delmsg",{id})}catch(x){}};
+let chImg="";
+const setChImg=u=>{chImg=u||"";$("#chprev").hidden=!chImg;$("#chthumb").src=chImg};
+// shrink a picked picture until it is small enough to send
+function shrinkImg(f,max,done){if(!f||!f.type.startsWith("image/"))return toast("Choose an image file");
+ const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{
+  for(let s=max;s>=80;s=Math.round(s*.8)){const k=Math.min(1,s/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));
+   const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);
+   const u=c.toDataURL("image/jpeg",.8);if(u.length<79000)return done(u)}
+  toast("That picture is too detailed")};im.onerror=()=>toast("Couldn’t read that image");im.src=rd.result};rd.readAsDataURL(f)}
+$("#chpick").onclick=()=>$("#chfile").click();
+$("#chfile").onchange=e=>{const f=e.target.files[0];e.target.value="";shrinkImg(f,360,setChImg)};
+$("#chx").onclick=()=>setChImg("");
 $("#send").onsubmit=async e=>{
- e.preventDefault();const t=$("#msg").value.trim();if(!t||!me())return;$("#msg").value="";
+ e.preventDefault();const t=$("#msg").value.trim();if((!t&&!chImg)||!me())return;
  try{
-  const c=t.match(/^\/pay\s+(\S+)\s+(\d+)$/i);
-  if(c)return pay(c[1],+c[2]);
-  if(t[0]==="/")return toast("Try /pay name 25");
-  await api("send",{text:t});
+  const c=!chImg&&t.match(/^\/pay\s+(\S+)\s+(\d+)$/i);
+  if(c){$("#msg").value="";return pay(c[1],+c[2])}
+  if(!chImg&&t[0]==="/"){$("#msg").value="";return toast("Try /pay name 25")}
+  await api("send",{text:t,img:chImg});$("#msg").value="";setChImg("");
  }catch(x){}
 };
 async function pay(to,amt){await api("pay",{to,amt});toast(`Sent ${amt} coins to ${to}`)}
@@ -641,17 +655,24 @@ function renderNews(){
  const box=$("#p-news"),a=isAdmin();
  if(!$("#nlist"))box.innerHTML='<div id="nform"></div><div id="nlist" style="display:grid;gap:.7rem"></div>';
  const f=$("#nform");
- if(a&&!f.firstChild)f.innerHTML=`<form id="nf" class="card" style="display:grid;gap:.5rem"><input name="title" placeholder="Headline" required maxlength="80"><div class="edb"><button type="button" class="ghost" data-ec="b" title="Bold"><b>B</b></button><button type="button" class="ghost" data-ec="i" title="Italic"><i>I</i></button><button type="button" class="ghost" data-ec="u" title="Underline"><u>U</u></button><button type="button" class="ghost" data-ec="h" title="Heading">H</button><button type="button" class="ghost" data-ec="ul" title="Bullet list">•</button><button type="button" class="ghost" data-ec="ol" title="Numbered list">1.</button><button type="button" class="ghost" data-ec="clear" title="Clear formatting">✕</button></div><div id="ned" class="ed" contenteditable="true" role="textbox" aria-label="News text" data-ph="What’s new?"></div><button>Post news</button></form>`;
+ if(a&&!f.firstChild)f.innerHTML=`<form id="nf" class="card" style="display:grid;gap:.5rem"><input name="title" placeholder="Headline" required maxlength="80"><div class="edb"><button type="button" class="ghost" data-ec="b" title="Bold"><b>B</b></button><button type="button" class="ghost" data-ec="i" title="Italic"><i>I</i></button><button type="button" class="ghost" data-ec="u" title="Underline"><u>U</u></button><button type="button" class="ghost" data-ec="h" title="Heading">H</button><button type="button" class="ghost" data-ec="s" title="Subheading">S</button><button type="button" class="ghost" data-ec="hr" title="Line">―</button><button type="button" class="ghost" data-ec="img" title="Picture">🖼</button><button type="button" class="ghost" data-ec="ul" title="Bullet list">•</button><button type="button" class="ghost" data-ec="ol" title="Numbered list">1.</button><button type="button" class="ghost" data-ec="clear" title="Clear formatting">✕</button></div><div id="ned" class="ed" contenteditable="true" role="textbox" aria-label="News text" data-ph="What’s new?"></div><input type="file" id="nfile" accept="image/*" hidden><button>Post news</button></form>`;
  else if(!a)f.innerHTML="";
  $("#nlist").innerHTML=news.map(n=>`<div class="card" style="display:grid;gap:.3rem"><b>${esc(n.title)}</b><div class="nb">${n.body}</div><small>${esc(n.name)} · ${new Date(n.ts).toLocaleDateString()}</small>${a?`<button class="bad" data-nrm="${n.id}">Delete</button>`:""}</div>`).join("")||'<div class="empty">No news yet.</div>';
 }
-$("#p-news").onsubmit=async e=>{e.preventDefault();const ed=$("#ned"),title=new FormData(e.target).get("title");if(!ed.textContent.trim())return toast("Write some text first");
+$("#p-news").onsubmit=async e=>{e.preventDefault();const ed=$("#ned"),title=new FormData(e.target).get("title");if(!ed.textContent.trim()&&!ed.querySelector("img"))return toast("Write some text first");
  try{await api("news/add",{title,body:ed.innerHTML});e.target.reset();ed.innerHTML="";toast("News posted")}catch(x){}};
+let nrange=null;
+$("#p-news").addEventListener("change",e=>{if(e.target.id!=="nfile")return;const f=e.target.files[0];e.target.value="";
+ shrinkImg(f,520,async u=>{try{const j=await api("pic/add",{img:u}),ed=$("#ned");ed.focus();if(nrange){const s=getSelection();s.removeAllRanges();s.addRange(nrange)}
+  document.execCommand("insertHTML",false,`<img src="/img/pic/${j.res.id}" alt="">`)}catch(x){}})});
+$("#p-news").addEventListener("drop",e=>{if(e.target.closest("#ned")&&e.dataTransfer&&e.dataTransfer.files.length)e.preventDefault()});
 $("#p-news").onmousedown=e=>{if(e.target.closest("[data-ec]"))e.preventDefault()};
 $("#p-news").addEventListener("paste",e=>{if(e.target.id==="ned"){e.preventDefault();document.execCommand("insertText",false,(e.clipboardData||window.clipboardData).getData("text/plain"))}});
 $("#p-news").onclick=async e=>{const t=e.target.closest("[data-ec]");
  if(t){const c=t.dataset.ec,ed=$("#ned"),x=(n,v)=>document.execCommand(n,false,v);if(document.activeElement!==ed)ed.focus();
-  if(c==="h")x("formatBlock",document.queryCommandValue("formatBlock").toLowerCase()==="h3"?"p":"h3");
+  if(c==="h"||c==="s"){const tg=c==="h"?"h3":"h4";x("formatBlock",document.queryCommandValue("formatBlock").toLowerCase()===tg?"p":tg)}
+  else if(c==="hr")x("insertHorizontalRule");
+  else if(c==="img"){const sl=getSelection();nrange=sl.rangeCount&&ed.contains(sl.anchorNode)?sl.getRangeAt(0).cloneRange():null;$("#nfile").click()}
   else if(c==="clear"){x("removeFormat");x("formatBlock","p")}
   else x({b:"bold",i:"italic",u:"underline",ul:"insertUnorderedList",ol:"insertOrderedList"}[c]);return}
  const id=e.target.dataset.nrm;if(id&&isAdmin())try{await api("news/remove",{id})}catch(x){}};
