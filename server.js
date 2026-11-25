@@ -32,13 +32,15 @@ db.exec("CREATE TABLE IF NOT EXISTS news(id INTEGER PRIMARY KEY AUTOINCREMENT,ti
 db.exec("CREATE TABLE IF NOT EXISTS foes(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT,name TEXT,img TEXT DEFAULT '',team TEXT,reward INTEGER DEFAULT 0)");
 try{db.exec("ALTER TABLE moves ADD COLUMN heal INTEGER DEFAULT 0")}catch(e){}
 try{db.exec("ALTER TABLE players ADD COLUMN fc TEXT DEFAULT '{}'")}catch(e){}
+try{db.exec("ALTER TABLE messages ADD COLUMN img TEXT DEFAULT ''")}catch(e){}
+db.exec("CREATE TABLE IF NOT EXISTS pics(id INTEGER PRIMARY KEY AUTOINCREMENT,img TEXT)");
 const MAX_SELL=5;
 const q=s=>db.prepare(s);
 
 // ---- persistence: the host's disk is wiped when the server sleeps, so the whole
 // database is copied to Supabase (one row) after changes and loaded back on startup.
 const SB_URL=(process.env.SUPABASE_URL||"").replace(/\/+$/,""),SB_KEY=process.env.SUPABASE_SERVICE_KEY||"",SB_ON=!!(SB_URL&&SB_KEY);
-const TABLES=["players","items","messages","sessions","blocked","cats","moves","notes","badwords","news","foes"];
+const TABLES=["players","items","messages","sessions","blocked","cats","moves","notes","badwords","news","foes","pics"];
 const sb=(method,p,body)=>fetch(SB_URL+"/rest/v1/"+p,{method,headers:{apikey:SB_KEY,...(SB_KEY.startsWith("eyJ")?{Authorization:"Bearer "+SB_KEY}:{}),"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:body&&JSON.stringify(body)});
 const EXTRA={};  // tables in the backup that this server doesn't know about: kept and written back untouched
 const dump=()=>{const o={...EXTRA};for(const t of TABLES)o[t]=db.prepare("SELECT * FROM "+t).all();return o};
@@ -222,15 +224,22 @@ const npcRun=x=>{for(let g=0;g<6&&x.state==="active"&&x[x.turn].npc;g++){const s
   const hs=pool.filter(m=>m.heal>0&&at.hp<at.max*.5);if(hs.length&&Math.random()<.7)pool=hs;
   hit(x,sd,pool[Math.floor(Math.random()*pool.length)])}};
 // news text: only a few harmless tags survive, with no attributes; everything else is shown as plain text
-const ENT={"&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"',"&#39;":"'","&nbsp;":" "},TAGMAP={b:"b",strong:"b",i:"i",em:"i",u:"u",h1:"h3",h2:"h3",h3:"h3",ul:"ul",ol:"ol",li:"li",p:"p",div:"p",br:"br"};
+const ENT={"&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"',"&#39;":"'","&nbsp;":" "},TAGMAP={b:"b",strong:"b",i:"i",em:"i",u:"u",h1:"h3",h2:"h3",h3:"h3",h4:"h4",h5:"h4",h6:"h4",ul:"ul",ol:"ol",li:"li",p:"p",div:"p",br:"br",hr:"hr"};
 const escT=t=>t.replace(/&[a-z#0-9]+;/gi,m=>ENT[m.toLowerCase()]??m).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
-const cleanHtml=s=>String(s||"").slice(0,6000).split(/(<[^>]*>)/).map((part,i)=>{if(i%2===0)return escT(part);
- const m=/^<\s*(\/?)\s*([a-z0-9]+)[^>]*>$/i.exec(part),n=m&&TAGMAP[m[2].toLowerCase()];if(!n)return "";return n==="br"?"<br>":`<${m[1]?"/":""}${n}>`}).join("");
+const cleanHtml=s=>String(s||"").slice(0,12000).split(/(<[^>]*>)/).map((part,i)=>{if(i%2===0)return escT(part);
+ const m=/^<\s*(\/?)\s*([a-z0-9]+)([^>]*)>$/i.exec(part);if(!m)return "";const nm=m[2].toLowerCase();
+ if(nm==="img"){const u=!m[1]&&/\ssrc\s*=\s*["']?(\/img\/pic\/\d{1,9})["'\s>\/]/i.exec(part+" ");return u?`<img src="${u[1]}" alt="">`:""}
+ const n=Object.hasOwn(TAGMAP,nm)?TAGMAP[nm]:"";if(!n)return "";
+ if(n==="br"||n==="hr")return m[1]?"":`<${n}>`;
+ return `<${m[1]?"/":""}${n}>`}).join("");
 // arcade: a game must be started on the server before it can pay out; payouts are capped per 24 hours
 const arc=new Map(),arcDay=new Map(),ARC_CAP=1000;
 const actions={
- send(p,b){const t=String(b.text||"").trim().slice(0,300);if(!t)bad("Empty message");
-  if(Date.now()-(lastMsg.get(p.id)||0)<500)bad("Slow down");lastMsg.set(p.id,Date.now());post(p.name,t,0)},
+ send(p,b){const t=String(b.text||"").trim().slice(0,300),img=imgOk(b.img);if(!t&&!img)bad("Empty message");
+  if(Date.now()-(lastMsg.get(p.id)||0)<(img?3000:500))bad("Slow down");lastMsg.set(p.id,Date.now());
+  q("INSERT INTO messages(name,text,ts,sys,img) VALUES(?,?,?,0,?)").run(p.name,t,Date.now(),img);
+  // keep the backup small: only the newest 20 chat pictures are kept
+  if(img)q("UPDATE messages SET img='' WHERE img!='' AND id NOT IN (SELECT id FROM messages WHERE img!='' ORDER BY id DESC LIMIT 20)").run()},
  pay(p,b){const t=find(b.to),n=parseInt(b.amt);
   if(!t||t.banned||t.id===p.id)bad("Pick another player by name");if(!(n>0))bad("Enter an amount");
   if(!inf(p)){if(p.coins<n)bad("You don’t have that many coins");q("UPDATE players SET coins=coins-? WHERE id=?").run(n,p.id)}
@@ -426,7 +435,8 @@ const actions={
  "word/ban"(p,b){adm(p);const w=String(b.w||"").trim().toLowerCase().slice(0,16);if(!/^[a-z0-9_]+$/.test(w)||norm(w).length<3)bad("Use a word of 3+ letters or numbers");
   q("INSERT OR IGNORE INTO badwords(w) VALUES(?)").run(w)},
  "word/unban"(p,b){adm(p);q("DELETE FROM badwords WHERE w=?").run(String(b.w||"").toLowerCase())},
- "news/add"(p,b){adm(p);const t=String(b.title||"").trim().slice(0,80),x=cleanHtml(b.body);if(!t||!x.replace(/<[^>]*>/g,"").trim())bad("Write a headline and some text");q("INSERT INTO news(title,body,name,ts) VALUES(?,?,?,?)").run(t,x,p.name,Date.now())},
+ "news/add"(p,b){adm(p);const t=String(b.title||"").trim().slice(0,80),x=cleanHtml(b.body);if(!t||!x.replace(/<(?!img\b)[^>]*>/g,"").trim())bad("Write a headline and some text");q("INSERT INTO news(title,body,name,ts) VALUES(?,?,?,?)").run(t,x,p.name,Date.now())},
+ "pic/add"(p,b){adm(p);const img=imgOk(b.img);if(!img)bad("That picture is too big or not supported");return{res:{id:Number(q("INSERT INTO pics(img) VALUES(?)").run(img).lastInsertRowid)}}},
  "news/remove"(p,b){adm(p);q("DELETE FROM news WHERE id=?").run(parseInt(b.id))},
  "arcade/start"(p,b){if(!["chess","tetris","snake"].includes(b.game))bad("Unknown game");arc.set(p.id,{game:b.game,ts:Date.now()})},
  "arcade/finish"(p,b){const s=arc.get(p.id);arc.delete(p.id);if(!s||s.game!==b.game||Date.now()-s.ts>72e5)bad("That game wasn’t started");
@@ -449,7 +459,7 @@ const snapshot=()=>{const on=new Set([...clients].map(c=>c.pid));return JSON.str
  items:q("SELECT * FROM items").all().map(i=>({id:i.id,name:i.name,emoji:i.emoji,desc:i.descr,price:i.price,stock:i.stock,kind:i.kind||"normal",seller:i.seller||"",cap:i.cap||0,rarity:i.rarity||"",listed:!i.hidden,gone:i.hidden===2,img:i.img?`/img/item/${i.id}?v=${iv(i.img)}`:""})),
  cats:q("SELECT * FROM cats").all().map(c=>({id:c.id,name:c.name,hp:c.hp,price:c.price||0,owner:c.owner||"",rarity:c.rarity||"",po:!!c.po,t:[c.t1||"normal",c.t2||""].filter(Boolean),evo:evoOf(c),listed:!c.hidden,gone:c.hidden===2,img:c.img?`/img/cat/${c.id}?v=${iv(c.img)}`:""})),
  moves:q("SELECT * FROM moves").all().map(k=>({id:k.id,name:k.name,damage:k.damage,anim:k.anim,price:k.price,owner:k.owner||"",rarity:k.rarity||"",type:k.type||"normal",heal:k.heal||0,listed:!k.hidden,gone:k.hidden===2,fx:fxInfo(k)})),
- messages:q("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all(),
+ messages:q("SELECT id,name,text,ts,sys,img!='' AS hasimg FROM (SELECT * FROM messages ORDER BY id DESC LIMIT 80) ORDER BY id").all().map(m=>({id:m.id,name:m.name,text:m.text,ts:m.ts,sys:m.sys,img:m.hasimg?`/img/msg/${m.id}`:""})),
  news:q("SELECT * FROM news ORDER BY id DESC LIMIT 30").all().map(n=>({...n,body:cleanHtml(n.body)})),
  foes:q("SELECT * FROM foes").all().map(f=>{let t=[];try{t=JSON.parse(f.team)}catch(e){}return{id:f.id,kind:f.kind,name:f.name,reward:f.reward||0,img:f.img?`/img/foe/${f.id}?v=${iv(f.img)}`:"",team:t}})})};
 function sendTo(c,base){const m=find(c.pid);if(!m)return;const cxm=JSON.parse(m.cx||"{}");
@@ -460,6 +470,7 @@ setInterval(()=>{for(const c of clients)c.res.write(": ping\n\n")},25000);
 setInterval(()=>{let d=0;for(const[k,x]of trades)if(Date.now()-x.ts>18e5){trades.delete(k);d=1}for(const[k,x]of battles)if(Date.now()-x.ts>9e5){refund(x);battles.delete(k);d=1}if(d)push()},60000);
 
 // ---- http
+const IMGT={item:"items",cat:"cats",foe:"foes",msg:"messages",pic:"pics"};
 const INDEX=fs.readFileSync(path.join(__dirname,"index.html"));
 const CSP="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'";
 const J=(res,code,o)=>{res.writeHead(code,{"Content-Type":"application/json"});res.end(JSON.stringify(o))};
@@ -482,7 +493,7 @@ http.createServer(async(req,res)=>{
    if(url.pathname.startsWith("/img/move/")){const[,,,id,n]=url.pathname.split("/"),r=q("SELECT fx FROM moves WHERE id=?").get(parseInt(id));let o={};try{o=JSON.parse(r&&r.fx||"{}")}catch(e){}
     const s=o.t==="gif"?o.g:o.t==="frames"?o.f[parseInt(n)]:"",m=/^data:(image\/(?:gif|png));base64,(.*)$/.exec(s||"");if(!m)return res.writeHead(404).end();
     res.writeHead(200,{"Content-Type":m[1],"Cache-Control":"public,max-age=31536000,immutable","X-Content-Type-Options":"nosniff"});return res.end(Buffer.from(m[2],"base64"))}
-   if(url.pathname.startsWith("/img/")){const[,,k,id]=url.pathname.split("/"),r=(k==="item"||k==="cat"||k==="foe")&&q(`SELECT img FROM ${k==="cat"?"cats":k==="foe"?"foes":"items"} WHERE id=?`).get(parseInt(id)),
+   if(url.pathname.startsWith("/img/")){const[,,k,id]=url.pathname.split("/"),r=Object.hasOwn(IMGT,k)&&q(`SELECT img FROM ${IMGT[k]} WHERE id=?`).get(parseInt(id)),
      m=r&&/^data:(image\/(?:jpeg|png|webp));base64,(.*)$/.exec(r.img||"");if(!m)return res.writeHead(404).end();
     res.writeHead(200,{"Content-Type":m[1],"Cache-Control":"public,max-age=31536000,immutable","X-Content-Type-Options":"nosniff"});return res.end(Buffer.from(m[2],"base64"))}
    if(url.pathname.startsWith("/avatar/")){const p=find(url.pathname.slice(8));
